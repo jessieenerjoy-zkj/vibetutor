@@ -12,7 +12,7 @@ import {
 import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect } from 'expo-router';
 import { FontAwesome6 } from '@expo/vector-icons';
-import Reanimated, { FadeInDown } from 'react-native-reanimated';
+import Reanimated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen } from '@/components/Screen';
 import { useSafeRouter } from '@/hooks/useSafeRouter';
@@ -21,6 +21,7 @@ import {
   MOOD_CONFIG,
   MOTD_MESSAGES,
   MOOD_PRESCRIPTIONS,
+  PERSONA_CONFIG,
   type MoodType,
 } from '@/utils/types';
 import {
@@ -118,6 +119,23 @@ const getDefaultInsight = (mood: MoodType, drops: number): string => {
 
   const options = insights[mood];
   return options[Math.floor(Math.random() * options.length)];
+};
+
+const withOpacity = (hex: string, opacity: number) => {
+  const normalized = hex.replace('#', '');
+  const fullHex = normalized.length === 3
+    ? normalized
+        .split('')
+        .map((value) => `${value}${value}`)
+        .join('')
+    : normalized;
+
+  const numeric = Number.parseInt(fullHex, 16);
+  const red = (numeric >> 16) & 255;
+  const green = (numeric >> 8) & 255;
+  const blue = numeric & 255;
+
+  return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
 };
 
 export default function HomeScreen() {
@@ -278,6 +296,14 @@ export default function HomeScreen() {
   const insightBody = isLoadingInsight
     ? 'Preparing a personalized next step for your current study vibe...'
     : aiInsight;
+  const activePrescription = todayMood ? MOOD_PRESCRIPTIONS[todayMood] : null;
+  const prescriptionPersona = activePrescription
+    ? PERSONA_CONFIG[activePrescription.persona]
+    : null;
+  const prescriptionAccent = activePrescription?.accentColor || UI.primary;
+  const prescriptionTint = withOpacity(prescriptionAccent, 0.12);
+  const prescriptionLine = withOpacity(prescriptionAccent, 0.22);
+  const prescriptionGlow = withOpacity(prescriptionAccent, 0.16);
 
   return (
     <Screen
@@ -332,7 +358,10 @@ export default function HomeScreen() {
               </View>
             </Reanimated.View>
 
-            <Reanimated.View entering={FadeInDown.duration(280).delay(60)} style={styles.section}>
+            <Reanimated.View
+              entering={FadeInDown.duration(280).delay(60)}
+              style={[styles.section, styles.moodSection]}
+            >
               <Text style={styles.sectionTitle}>HOW ARE YOU FEELING?</Text>
               <View style={styles.moodRow}>
                 {MOOD_ORDER.map((mood) => {
@@ -361,6 +390,65 @@ export default function HomeScreen() {
                 })}
               </View>
             </Reanimated.View>
+
+            {activePrescription ? (
+              <Reanimated.View
+                entering={FadeInDown.duration(300).delay(110)}
+                style={[styles.prescriptionCard, styles.section, { borderColor: prescriptionLine }]}
+              >
+                <View style={[styles.prescriptionGlow, { backgroundColor: prescriptionGlow }]} />
+                <View style={styles.prescriptionGlowSecondary} />
+
+                <Reanimated.View
+                  key={todayMood}
+                  entering={FadeIn.duration(180)}
+                  exiting={FadeOut.duration(140)}
+                  style={styles.prescriptionContent}
+                >
+                  <View style={styles.prescriptionHeader}>
+                    <View style={[styles.prescriptionBadge, { backgroundColor: prescriptionTint }]}>
+                      <FontAwesome6
+                        name={activePrescription.badgeIcon as any}
+                        size={12}
+                        color={prescriptionAccent}
+                      />
+                      <Text style={[styles.prescriptionBadgeText, { color: prescriptionAccent }]}>
+                        {activePrescription.badge.toUpperCase()}
+                      </Text>
+                    </View>
+
+                    <View
+                      style={[
+                        styles.prescriptionAvatar,
+                        { backgroundColor: prescriptionTint, borderColor: prescriptionLine },
+                      ]}
+                    >
+                      <FontAwesome6
+                        name={(prescriptionPersona?.icon || 'wand-magic-sparkles') as any}
+                        size={18}
+                        color={prescriptionAccent}
+                      />
+                    </View>
+                  </View>
+
+                  <Text style={styles.prescriptionEyebrow}>EMOTION PRESCRIPTION</Text>
+                  <Text style={styles.prescriptionTitle}>{activePrescription.title}</Text>
+                  <Text style={styles.prescriptionCopy}>{activePrescription.copy}</Text>
+
+                  <TouchableOpacity
+                    activeOpacity={0.88}
+                    onPress={() => void handlePrescriptionPress()}
+                    style={[
+                      styles.prescriptionButton,
+                      { backgroundColor: prescriptionAccent, shadowColor: prescriptionAccent },
+                    ]}
+                  >
+                    <Text style={styles.prescriptionButtonText}>{activePrescription.cta}</Text>
+                    <FontAwesome6 name="arrow-right" size={14} color="#ffffff" />
+                  </TouchableOpacity>
+                </Reanimated.View>
+              </Reanimated.View>
+            ) : null}
 
             <Reanimated.View entering={FadeInDown.duration(280).delay(120)} style={[styles.card, styles.section]}>
               <View style={styles.reservoirHeader}>
@@ -459,6 +547,9 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 30,
   },
+  moodSection: {
+    marginBottom: 18,
+  },
   card: {
     backgroundColor: UI.card,
     borderColor: UI.border,
@@ -546,6 +637,105 @@ const styles = StyleSheet.create({
   moodLabelActive: {
     color: '#b8133c',
     fontFamily: FONT.bold,
+  },
+  prescriptionCard: {
+    backgroundColor: '#fffdfd',
+    borderRadius: 28,
+    borderWidth: 1,
+    overflow: 'hidden',
+    padding: 24,
+    position: 'relative',
+    shadowColor: '#705b66',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 18,
+    elevation: 3,
+  },
+  prescriptionGlow: {
+    borderRadius: 180,
+    height: 180,
+    position: 'absolute',
+    right: -52,
+    top: -68,
+    width: 180,
+  },
+  prescriptionGlowSecondary: {
+    backgroundColor: 'rgba(125, 165, 255, 0.12)',
+    borderRadius: 120,
+    bottom: -68,
+    height: 120,
+    left: -24,
+    position: 'absolute',
+    width: 120,
+  },
+  prescriptionContent: {
+    gap: 14,
+  },
+  prescriptionHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  prescriptionBadge: {
+    alignItems: 'center',
+    borderRadius: 999,
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  prescriptionBadgeText: {
+    fontFamily: FONT.bold,
+    fontSize: 11,
+    letterSpacing: 1.4,
+  },
+  prescriptionAvatar: {
+    alignItems: 'center',
+    borderRadius: 22,
+    borderWidth: 1,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+  prescriptionEyebrow: {
+    color: UI.muted,
+    fontFamily: FONT.bold,
+    fontSize: 12,
+    letterSpacing: 2.2,
+  },
+  prescriptionTitle: {
+    color: UI.text,
+    fontFamily: FONT.bold,
+    fontSize: 22,
+    letterSpacing: -0.8,
+    lineHeight: 30,
+  },
+  prescriptionCopy: {
+    color: UI.text,
+    fontFamily: FONT.regular,
+    fontSize: 15,
+    lineHeight: 26,
+  },
+  prescriptionButton: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: 18,
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'center',
+    marginTop: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    elevation: 4,
+  },
+  prescriptionButtonText: {
+    color: '#ffffff',
+    fontFamily: FONT.bold,
+    fontSize: 15,
   },
   reservoirHeader: {
     alignItems: 'flex-start',
