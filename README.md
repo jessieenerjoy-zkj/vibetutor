@@ -259,3 +259,47 @@ import { Screen } from '../../../components/Screen';
 ## 本地开发
 
 `coze dev`：用来首次启动前后端服务，也可以用来重启前后端服务（该命令会先尝试杀掉占用端口的进程，再启动服务）
+
+## 服务端环境变量（AI Tutor）
+
+在首次启动前，请在 `server/` 目录按以下方式准备环境变量：
+
+```bash
+cd server
+cp .env.example .env
+# 然后手动填入密钥
+```
+
+### 必填项
+
+- `OPENROUTER_API_KEY`
+  - 用于 OpenRouter 调用。
+  - **TTS 接口 `/api/v1/tts` 必须依赖该 key**。
+
+### 强烈建议填写
+
+- `GEMINI_API_KEY`
+  - 当 OpenRouter 文本/视觉模型不可用时，服务端会回退到 Gemini。
+
+### 常用可配项
+
+- `PORT`（默认 `9091`）
+- `OPENROUTER_TEXT_MODEL`（默认 `openai/gpt-4o-mini`）
+- `OPENROUTER_VISION_MODEL`（默认 `openai/gpt-4o-mini`）
+- `OPENROUTER_TTS_MODEL`（默认 `openai/gpt-audio-mini`）
+- `OPENROUTER_*_MODEL_FALLBACKS`（逗号分隔候补模型）
+- `OPENROUTER_*_TIMEOUT_MS` / `OPENROUTER_*_MAX_RETRIES`
+- `TTS_VOICE_OPRAH` / `TTS_VOICE_EINSTEIN` / `TTS_VOICE_TRUMP` / `TTS_VOICE_ELON` / `TTS_VOICE_SHERLOCK`
+
+### 已废弃项
+
+- `OPENROUTER_MODEL_BASE_URL`
+  - 该项已不在当前后端实现中使用，可删除。
+
+### 快速自检
+
+```bash
+curl http://localhost:9091/api/v1/health
+```
+
+返回 `{"status":"ok"}` 表示服务端可用。
