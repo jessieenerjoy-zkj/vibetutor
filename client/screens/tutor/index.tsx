@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Audio } from 'expo-av';
+import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle } from 'react-native-svg';
 import Animated, {
   useSharedValue,
@@ -1134,6 +1135,35 @@ export default function TutorScreen() {
       </View>
 
         {/* Messages */}
+        <View className="flex-1">
+          <LinearGradient
+            pointerEvents="none"
+            colors={['#F4F2F5', '#F2F1F6', '#F5F3F4']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: 0,
+              bottom: 0,
+            }}
+          />
+          <LinearGradient
+            pointerEvents="none"
+            colors={['rgba(160, 143, 255, 0.16)', 'rgba(255, 180, 198, 0.08)', 'rgba(255,255,255,0)']}
+            locations={[0, 0.58, 1]}
+            start={{ x: 0, y: 0.2 }}
+            end={{ x: 1, y: 0.9 }}
+            style={{
+              position: 'absolute',
+              left: 20,
+              right: 20,
+              top: isProfileExpanded ? insets.top + 254 : insets.top + 146,
+              height: 300,
+              borderRadius: 30,
+            }}
+          />
         <ScrollView
           ref={scrollViewRef}
           className="flex-1 px-5"
@@ -1203,6 +1233,8 @@ export default function TutorScreen() {
             </View>
           )}
         </ScrollView>
+
+        </View>
 
         {/* Selected Image Preview */}
         {selectedImage && (
