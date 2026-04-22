@@ -1079,62 +1079,58 @@ export default function TutorScreen() {
         <View className="flex-1 bg-[#F9F2F7]">
           <ScrollView
             className="flex-1"
-            contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 44, paddingBottom: 28 }}
+            contentContainerStyle={{ paddingHorizontal: 22, paddingTop: 40, paddingBottom: 26 }}
             showsVerticalScrollIndicator={false}
           >
-            <View className="items-center">
-              <Text className="text-[50px] leading-[64px] text-[#FFE1EC]">✦</Text>
-              <Text className="mt-1 text-center text-[50px] leading-[64px] text-[#FFE1EC]">✦</Text>
-            </View>
-
-            <Text className="mt-2 text-center text-[38px] font-black tracking-[-0.9px] text-[#221A22]">
+            
+            <Text className="mt-2 text-center text-[20px] font-bold tracking-[-0.2px] text-[#221A22]">
               Daily Learning Report
             </Text>
-            <Text className="mt-3 text-center text-[28px] leading-[36px] text-[#5F4A56]">
+            <Text className="mt-2 text-center text-[12px] leading-[18px] text-[#5F4A56]">
               You have completed today&apos;s learning tasks
             </Text>
 
-            <View className="mt-8 flex-row gap-4">
+            <View className="mt-6 flex-row gap-4">
               <View
-                className="flex-1 rounded-[26px] border border-[#E5DFE3] bg-[#FAF9FA] px-5 py-5"
+                className="flex-1 rounded-[18px] border border-[#E5DFE3] bg-[#FAF9FA] px-4 py-4"
                 style={{
                   shadowColor: '#2B1D24',
-                  shadowOffset: { width: 0, height: 8 },
-                  shadowOpacity: 0.06,
-                  shadowRadius: 16,
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 10,
                   elevation: 2,
                 }}
               >
-                <Text className="text-[20px] leading-[27px] text-[#4D3843]">Questions</Text>
-                <Text className="text-[20px] leading-[27px] text-[#4D3843]">Photographed</Text>
-                <Text className="mt-4 text-[42px] font-extrabold text-[#FF184F]">
+                <Text className="text-[14px] leading-[19px] text-[#4D3843]">Questions</Text>
+                <Text className="text-[14px] leading-[19px] text-[#4D3843]">Photographed</Text>
+                <Text className="mt-3 text-[22px] font-bold text-[#FF184F]">
                   {reportData?.totalSolved ?? 0} Questions
                 </Text>
               </View>
 
               <View
-                className="flex-1 rounded-[26px] border border-[#E5DFE3] bg-[#FAF9FA] px-5 py-5"
+                className="flex-1 rounded-[18px] border border-[#E5DFE3] bg-[#FAF9FA] px-4 py-4"
                 style={{
                   shadowColor: '#2B1D24',
-                  shadowOffset: { width: 0, height: 8 },
-                  shadowOpacity: 0.06,
-                  shadowRadius: 16,
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 10,
                   elevation: 2,
                 }}
               >
-                <Text className="text-center text-[20px] leading-[27px] text-[#4D3843]">Time Spent</Text>
-                <View className="mt-5 flex-row items-center justify-center">
-                  <View className="mr-2 h-7 w-7 items-center justify-center rounded-full bg-[#FF184F]">
-                    <FontAwesome6 name="clock" size={12} color="#fff" />
+                <Text className="text-center text-[14px] leading-[19px] text-[#4D3843]">Time Spent</Text>
+                <View className="mt-3 flex-row items-center justify-center">
+                  <View className="mr-2 h-5 w-5 items-center justify-center rounded-full bg-[#FF184F]">
+                    <FontAwesome6 name="clock" size={9} color="#fff" />
                   </View>
-                  <Text className="text-[42px] font-extrabold text-[#FF184F]">
+                  <Text className="text-[22px] font-bold text-[#FF184F]">
                     {reportData?.totalMins ?? 0} Minute
                   </Text>
                 </View>
               </View>
             </View>
 
-            <View className="mt-6 rounded-[24px] border border-[#E8E0E5] bg-white px-5 py-5">
+            <View className="mt-5 rounded-[20px] border border-[#E8E0E5] bg-white px-4 py-4">
               <View className="flex-row items-center justify-between">
                 <Text className="text-xs font-semibold uppercase tracking-[1.5px] text-[#8D6A79]">Subject Breakdown</Text>
                 <Text className="text-xs text-[#9C7B88]">{totalSubjectsSolved} solved</Text>
@@ -1153,7 +1149,7 @@ export default function TutorScreen() {
               </View>
             </View>
 
-            <View className="mt-6 gap-3">
+            <View className="mt-5 gap-3">
               <TouchableOpacity
                 activeOpacity={0.88}
                 onPress={() => {
