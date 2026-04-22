@@ -1,6 +1,9 @@
 // 心情类型
 export type MoodType = 'Crushed' | 'Stuck' | 'Calm' | 'Engaged' | 'Hyper';
 
+// Tutor 学科分类
+export type SubjectType = 'Math' | 'Physics' | 'Chemistry' | 'History' | 'Other';
+
 // 心情配置
 export const MOOD_CONFIG: Record<MoodType, { label: string; icon: string; color: string }> = {
   Crushed: { label: 'Crushed', icon: 'face-dizzy', color: '#E74C3C' },

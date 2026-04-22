@@ -6,6 +6,7 @@ import {
   DropsData,
   LikeRecord,
   ChatMessage,
+  SubjectType,
 } from './types';
 import {
   DAILY_DROP_LIMIT,
@@ -24,6 +25,8 @@ const KEYS = {
   CHAT_HISTORY: 'chatHistory',
   TUTOR_GREETING_STATE: 'tutorGreetingState',
   ANALYTICS_EVENTS: 'analyticsEvents',
+  TUTOR_FOCUS_TIME: 'tutorFocusTime',
+  TUTOR_SUBJECT_STATS: 'tutorSubjectStats',
 };
 
 interface TutorGreetingState {
@@ -41,6 +44,23 @@ interface AnalyticsEventRecord {
   timestamp: string;
 }
 
+export type SubjectBreakdown = Record<SubjectType, number>;
+
+interface TutorFocusTimeData {
+  [date: string]: number;
+}
+
+interface TutorSubjectStatsData {
+  [date: string]: SubjectBreakdown;
+}
+
+export interface TodayStudyReportData {
+  date: string;
+  totalMins: number;
+  totalSolved: number;
+  subjectBreakdown: SubjectBreakdown;
+}
+
 export interface DropUpdateResult {
   drops: number;
   added: boolean;
@@ -50,6 +70,80 @@ export interface DropUpdateResult {
   mindGardenState: MindGardenState;
   unlockedStamp: MindGardenStampProgress | null;
 }
+
+const getDefaultSubjectBreakdown = (): SubjectBreakdown => ({
+  Math: 0,
+  Physics: 0,
+  Chemistry: 0,
+  History: 0,
+  Other: 0,
+});
+
+const SUBJECT_TYPES: SubjectType[] = ['Math', 'Physics', 'Chemistry', 'History', 'Other'];
+
+const normalizeSubject = (raw: string | null | undefined): SubjectType => {
+  const value = (raw || '').trim().toLowerCase();
+
+  if (value === 'math' || value === 'mathematics') return 'Math';
+  if (value === 'physics') return 'Physics';
+  if (value === 'chemistry' || value === 'chem') return 'Chemistry';
+  if (value === 'history') return 'History';
+
+  return 'Other';
+};
+
+const sanitizeSubjectBreakdown = (value: unknown): SubjectBreakdown => {
+  const fallback = getDefaultSubjectBreakdown();
+
+  if (!value || typeof value !== 'object') {
+    return fallback;
+  }
+
+  const input = value as Record<string, unknown>;
+  const output = getDefaultSubjectBreakdown();
+
+  for (const subject of SUBJECT_TYPES) {
+    const numericValue = Number(input[subject]);
+    output[subject] = Number.isFinite(numericValue) && numericValue > 0
+      ? Math.floor(numericValue)
+      : 0;
+  }
+
+  return output;
+};
+
+const sanitizeTutorFocusTimeData = (value: unknown): TutorFocusTimeData => {
+  if (!value || typeof value !== 'object') {
+    return {};
+  }
+
+  const input = value as Record<string, unknown>;
+  const output: TutorFocusTimeData = {};
+
+  for (const [date, seconds] of Object.entries(input)) {
+    const numericValue = Number(seconds);
+    output[date] = Number.isFinite(numericValue) && numericValue > 0
+      ? Math.floor(numericValue)
+      : 0;
+  }
+
+  return output;
+};
+
+const sanitizeTutorSubjectStatsData = (value: unknown): TutorSubjectStatsData => {
+  if (!value || typeof value !== 'object') {
+    return {};
+  }
+
+  const input = value as Record<string, unknown>;
+  const output: TutorSubjectStatsData = {};
+
+  for (const [date, breakdown] of Object.entries(input)) {
+    output[date] = sanitizeSubjectBreakdown(breakdown);
+  }
+
+  return output;
+};
 
 const clampDrops = (value: unknown): number => {
   const numericValue = Number(value);
@@ -365,5 +459,131 @@ export const getUserStats = async (): Promise<{
     totalDrops,
     streakDays,
     todayMinutes: 0,
+  };
+};
+
+
+const getTutorFocusTimeData = async (): Promise<TutorFocusTimeData> => {
+  try {
+    const data = await AsyncStorage.getItem(KEYS.TUTOR_FOCUS_TIME);
+    const parsed = data ? JSON.parse(data) : {};
+    return sanitizeTutorFocusTimeData(parsed);
+  } catch {
+    return {};
+  }
+};
+
+const saveTutorFocusTimeData = async (value: TutorFocusTimeData): Promise<void> => {
+  await AsyncStorage.setItem(KEYS.TUTOR_FOCUS_TIME, JSON.stringify(value));
+};
+
+const getTutorSubjectStatsData = async (): Promise<TutorSubjectStatsData> => {
+  try {
+    const data = await AsyncStorage.getItem(KEYS.TUTOR_SUBJECT_STATS);
+    const parsed = data ? JSON.parse(data) : {};
+    return sanitizeTutorSubjectStatsData(parsed);
+  } catch {
+    return {};
+  }
+};
+
+const saveTutorSubjectStatsData = async (value: TutorSubjectStatsData): Promise<void> => {
+  await AsyncStorage.setItem(KEYS.TUTOR_SUBJECT_STATS, JSON.stringify(value));
+};
+
+export const recordTutorFocusDuration = async (seconds: number): Promise<void> => {
+  const safeSeconds = Math.max(0, Math.floor(seconds));
+  if (safeSeconds <= 0) {
+    return;
+  }
+
+  const today = getTodayString();
+  const current = await getTutorFocusTimeData();
+  const nextValue = (current[today] || 0) + safeSeconds;
+
+  await saveTutorFocusTimeData({
+    ...current,
+    [today]: nextValue,
+  });
+};
+
+export const getTodayFocusMinutes = async (): Promise<number> => {
+  const today = getTodayString();
+  const focusData = await getTutorFocusTimeData();
+  const totalSeconds = focusData[today] || 0;
+  return Math.max(0, Math.floor(totalSeconds / 60));
+};
+
+export const recordTutorSolvedSubject = async (subject: SubjectType): Promise<void> => {
+  const today = getTodayString();
+  const stats = await getTutorSubjectStatsData();
+  const todayStats = sanitizeSubjectBreakdown(stats[today]);
+
+  todayStats[subject] += 1;
+
+  await saveTutorSubjectStatsData({
+    ...stats,
+    [today]: todayStats,
+  });
+};
+
+export const getTodaySubjectBreakdown = async (): Promise<SubjectBreakdown> => {
+  const today = getTodayString();
+  const stats = await getTutorSubjectStatsData();
+  return sanitizeSubjectBreakdown(stats[today]);
+};
+
+export const extractSubjectTag = (rawContent: string): { content: string; subject: SubjectType } => {
+  const text = String(rawContent || '');
+  const trimmed = text.trimEnd();
+
+  const closeBracketIndex = trimmed.lastIndexOf(']');
+  const openBracketIndex = trimmed.lastIndexOf('[');
+
+  if (openBracketIndex === -1 || closeBracketIndex !== trimmed.length - 1 || openBracketIndex >= closeBracketIndex) {
+    return {
+      content: trimmed,
+      subject: 'Other',
+    };
+  }
+
+  const insideTag = trimmed.slice(openBracketIndex + 1, closeBracketIndex).trim();
+  const separatorIndex = insideTag.indexOf(':');
+
+  if (separatorIndex === -1) {
+    return {
+      content: trimmed,
+      subject: 'Other',
+    };
+  }
+
+  const tagKey = insideTag.slice(0, separatorIndex).trim().toLowerCase();
+  if (tagKey !== 'subject') {
+    return {
+      content: trimmed,
+      subject: 'Other',
+    };
+  }
+
+  const subjectText = insideTag.slice(separatorIndex + 1).trim();
+
+  return {
+    content: trimmed.slice(0, openBracketIndex).trimEnd(),
+    subject: normalizeSubject(subjectText),
+  };
+};
+
+export const getTodayStudyReportData = async (): Promise<TodayStudyReportData> => {
+  const [totalMins, totalSolved, subjectBreakdown] = await Promise.all([
+    getTodayFocusMinutes(),
+    getTodayDrops(),
+    getTodaySubjectBreakdown(),
+  ]);
+
+  return {
+    date: getTodayString(),
+    totalMins,
+    totalSolved,
+    subjectBreakdown,
   };
 };

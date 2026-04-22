@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,9 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  Modal,
+  Share,
+  AppState,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -44,7 +47,14 @@ import {
   getTodayMood,
   shouldTutorAutoGreet,
   saveTutorGreetingState,
+  trackLocalEvent,
+  extractSubjectTag,
+  recordTutorSolvedSubject,
+  getTodayStudyReportData,
+  recordTutorFocusDuration,
   type DropUpdateResult,
+  type SubjectBreakdown,
+  type TodayStudyReportData,
 } from '@/utils/storage';
 
 const PERSONAS: TutorPersona[] = ['Gentle', 'Gordon', 'Trump', 'WiseElder', 'Neutral'];
@@ -66,6 +76,17 @@ const resolveBackendBaseUrl = () => {
 const BACKEND_BASE_URL = resolveBackendBaseUrl();
 
 const MIN_IMAGE_BASE64_LENGTH = 1000;
+
+const FINISH_LEARNING_EMPTY_TOAST = "You haven't solved any problems yet today. Let's get started!";
+const FOCUS_TICK_SECONDS = 10;
+
+const REPORT_SUBJECT_LABELS: Array<{ key: keyof SubjectBreakdown; label: string }> = [
+  { key: 'Math', label: 'Math' },
+  { key: 'Physics', label: 'Physics' },
+  { key: 'Chemistry', label: 'Chemistry' },
+  { key: 'History', label: 'History' },
+  { key: 'Other', label: 'Other' },
+];
 
 const PERSONA_MOOD_GREETINGS: Record<MoodType, Record<TutorPersona, string>> = {
   Crushed: {
@@ -173,8 +194,13 @@ export default function TutorScreen() {
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [todayMood, setTodayMood] = useState<MoodType>('Calm');
   const [celebration, setCelebration] = useState<DropUpdateResult['unlockedStamp']>(null);
+  const [showFinishModal, setShowFinishModal] = useState(false);
+  const [showReportCard, setShowReportCard] = useState(false);
+  const [reportData, setReportData] = useState<TodayStudyReportData | null>(null);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 
   const legacyGreetingTexts = useRef(['嘿，亲爱的。今天感觉怎么样?我在这里陪着你，慢慢来，不着急哦~']);
+  const focusIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -260,6 +286,72 @@ export default function TutorScreen() {
     useCallback(() => {
       loadData();
     }, [loadData])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      const appStateSubscription = AppState.addEventListener('change', (state) => {
+        const canStartOnWeb =
+          Platform.OS !== 'web' || typeof document === 'undefined' || document.visibilityState === 'visible';
+
+        if (state === 'active' && canStartOnWeb) {
+          if (!focusIntervalRef.current) {
+            focusIntervalRef.current = setInterval(() => {
+              void recordTutorFocusDuration(FOCUS_TICK_SECONDS);
+            }, FOCUS_TICK_SECONDS * 1000);
+          }
+        } else if (focusIntervalRef.current) {
+          clearInterval(focusIntervalRef.current);
+          focusIntervalRef.current = null;
+        }
+      });
+
+      const canStartImmediately =
+        AppState.currentState === 'active' &&
+        (Platform.OS !== 'web' || typeof document === 'undefined' || document.visibilityState === 'visible');
+
+      if (canStartImmediately && !focusIntervalRef.current) {
+        focusIntervalRef.current = setInterval(() => {
+          void recordTutorFocusDuration(FOCUS_TICK_SECONDS);
+        }, FOCUS_TICK_SECONDS * 1000);
+      }
+
+      const visibilityCleanup =
+        Platform.OS === 'web' && typeof document !== 'undefined'
+          ? (() => {
+              const onVisibilityChange = () => {
+                if (document.visibilityState === 'visible') {
+                  if (!focusIntervalRef.current) {
+                    focusIntervalRef.current = setInterval(() => {
+                      void recordTutorFocusDuration(FOCUS_TICK_SECONDS);
+                    }, FOCUS_TICK_SECONDS * 1000);
+                  }
+                } else if (focusIntervalRef.current) {
+                  clearInterval(focusIntervalRef.current);
+                  focusIntervalRef.current = null;
+                }
+              };
+
+              document.addEventListener('visibilitychange', onVisibilityChange);
+              onVisibilityChange();
+
+              return () => {
+                document.removeEventListener('visibilitychange', onVisibilityChange);
+              };
+            })()
+          : null;
+
+      return () => {
+        appStateSubscription.remove();
+        if (visibilityCleanup) {
+          visibilityCleanup();
+        }
+        if (focusIntervalRef.current) {
+          clearInterval(focusIntervalRef.current);
+          focusIntervalRef.current = null;
+        }
+      };
+    }, [])
   );
 
   useEffect(() => {
@@ -522,6 +614,120 @@ export default function TutorScreen() {
     }
   };
 
+  const handleOpenFinishLearning = useCallback(async () => {
+    const todaySolved = await getTodayDrops();
+
+    await trackLocalEvent('click_finish_learning', {
+      today_solved: todaySolved,
+    });
+
+    if (todaySolved <= 0) {
+      Toast.show({
+        type: 'info',
+        text1: FINISH_LEARNING_EMPTY_TOAST,
+      });
+      return;
+    }
+
+    setShowFinishModal(true);
+  }, []);
+
+  const handleGenerateReport = useCallback(async () => {
+    setShowFinishModal(false);
+    setIsGeneratingReport(true);
+
+    try {
+      const report = await getTodayStudyReportData();
+      setReportData(report);
+
+      await trackLocalEvent('generate_report_card', {
+        total_mins: report.totalMins,
+        total_solved: report.totalSolved,
+      });
+
+      setShowReportCard(true);
+    } catch (error) {
+      console.error('Failed to generate report card:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to generate report',
+        text2: 'Please try again in a moment.',
+      });
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  }, []);
+
+  const handleShareReport = useCallback(async () => {
+    if (!reportData) {
+      return;
+    }
+
+    const breakdownText = REPORT_SUBJECT_LABELS
+      .map(({ key, label }) => `${label}: ${reportData.subjectBreakdown[key]}`)
+      .join(' · ');
+
+    const message = [
+      'Gauth Study Report Card',
+      `Today’s Focus Time: ${reportData.totalMins} min`,
+      `Problems Solved: ${reportData.totalSolved}`,
+      `Subject Breakdown: ${breakdownText}`,
+    ].join('\n');
+
+    let shareTarget = 'copy';
+
+    try {
+      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && (navigator as any).share) {
+        await (navigator as any).share({
+          title: 'Gauth Study Report Card',
+          text: message,
+        });
+        shareTarget = 'ig';
+      } else {
+        await Share.share({ message, title: 'Gauth Study Report Card' });
+        shareTarget = 'tiktok';
+      }
+    } catch (error) {
+      if (String(error).toLowerCase().includes('abort')) {
+        return;
+      }
+      shareTarget = 'copy';
+      console.error('Share report failed:', error);
+      Toast.show({
+        type: 'info',
+        text1: 'Share failed',
+        text2: 'Please try again.',
+      });
+    } finally {
+      await trackLocalEvent('share_report_card', {
+        share_target: shareTarget,
+      });
+    }
+  }, [reportData]);
+
+  const reportBreakdownRows = useMemo(() => {
+    const breakdown = reportData?.subjectBreakdown;
+    if (!breakdown) {
+      return [];
+    }
+
+    return REPORT_SUBJECT_LABELS
+      .map(({ key, label }) => ({
+        key,
+        label,
+        value: breakdown[key],
+      }))
+      .filter((item) => item.value > 0);
+  }, [reportData]);
+
+  const totalSubjectsSolved = useMemo(() => {
+    if (!reportData) {
+      return 0;
+    }
+
+    return Object.values(reportData.subjectBreakdown).reduce((sum, count) => sum + count, 0);
+  }, [reportData]);
+
   const handleSend = useCallback(async () => {
     const imageToSend = selectedImage;
     const imageBase64ToSend = selectedImageBase64;
@@ -577,10 +783,11 @@ export default function TutorScreen() {
 
       if (response.ok) {
         const data = await response.json();
+        const parsedReply = extractSubjectTag(data.content);
         const assistantMessage: ChatMessage = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
-          content: data.content,
+          content: parsedReply.content,
           timestamp: new Date(),
         };
 
@@ -592,6 +799,11 @@ export default function TutorScreen() {
           const dedupeKey = buildDropSignature(messageToBackend, imageBase64, imageToSend);
           const dropResult = await addDrop({ dedupeKey });
           setTodayDrops(dropResult.drops);
+
+          if (dropResult.added) {
+            await recordTutorSolvedSubject(parsedReply.subject);
+          }
+
           handleDropEffects(dropResult);
         } catch (dropError) {
           console.error('Learning Drop update error:', dropError);
@@ -630,9 +842,21 @@ export default function TutorScreen() {
                 <Text className="text-xs text-[var(--color-muted)]">{todayDrops}/{DAILY_DROP_LIMIT}</Text>
               </View>
             </View>
-            <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/')}>
-              <FontAwesome6 name="house" size={18} color="var(--color-muted)" />
-            </TouchableOpacity>
+            <View className="flex-row items-center gap-3">
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  void handleOpenFinishLearning();
+                }}
+                className="flex-row items-center rounded-full border border-[#F2E6EA] bg-[#FFF7F9] px-3 py-1.5"
+              >
+                <FontAwesome6 name="flag-checkered" size={11} color="#D93A6A" />
+                <Text className="ml-1.5 text-xs font-semibold text-[#D93A6A]">Finish Learning</Text>
+              </TouchableOpacity>
+              <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/')}>
+                <FontAwesome6 name="house" size={18} color="var(--color-muted)" />
+              </TouchableOpacity>
+            </View>
           </View>
 
           <View>
@@ -794,9 +1018,9 @@ export default function TutorScreen() {
                 activeOpacity={0.85}
                 onPress={handleSend}
                 className="w-10 h-10 rounded-full bg-[var(--color-foreground)] items-center justify-center"
-                disabled={isTyping}
+                disabled={isTyping || isGeneratingReport}
               >
-                {isTyping ? (
+                {isTyping || isGeneratingReport ? (
                   <ActivityIndicator size="small" color="#fff" />
                 ) : (
                   <FontAwesome6 name="arrow-up" size={14} color="#fff" />
@@ -806,6 +1030,124 @@ export default function TutorScreen() {
           </View>
         </View>
       </View>
+
+      <Modal
+        visible={showFinishModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setShowFinishModal(false)}
+      >
+        <View className="flex-1 items-center justify-center px-6">
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={() => setShowFinishModal(false)}
+            className="absolute inset-0 bg-black/35"
+          />
+          <View className="w-full max-w-[360px] rounded-3xl bg-white px-6 py-6">
+            <Text className="text-center text-xl font-bold text-[#22171D]">Wrap up for today?</Text>
+            <Text className="mt-3 text-center text-sm leading-5 text-[#6B5A61]">
+              You can keep going or generate your study report card now.
+            </Text>
+            <View className="mt-6 flex-row gap-3">
+              <TouchableOpacity
+                className="flex-1 items-center justify-center rounded-2xl border border-[#E9DCE1] bg-[#FFF8FA] py-3"
+                activeOpacity={0.85}
+                onPress={() => setShowFinishModal(false)}
+              >
+                <Text className="text-sm font-semibold text-[#8B6A76]">Keep Learning</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                className="flex-1 items-center justify-center rounded-2xl bg-[#D93A6A] py-3"
+                activeOpacity={0.85}
+                onPress={() => {
+                  void handleGenerateReport();
+                }}
+              >
+                <Text className="text-sm font-semibold text-white">Yes, generate my report</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={showReportCard}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setShowReportCard(false)}
+      >
+        <View className="flex-1 bg-[#FFF6F8]">
+          <ScrollView
+            className="flex-1"
+            contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 34, paddingBottom: 24 }}
+            showsVerticalScrollIndicator={false}
+          >
+            <View className="rounded-[30px] border border-[#F3DDE6] bg-white px-6 py-6">
+              <View className="flex-row items-center justify-between">
+                <View>
+                  <Text className="text-xs font-semibold uppercase tracking-[2px] text-[#CB6B8C]">Gauth</Text>
+                  <Text className="mt-1 text-2xl font-bold text-[#2B1F25]">Study Report Card</Text>
+                </View>
+                <View className="h-11 w-11 items-center justify-center rounded-full bg-[#FFE8EF]">
+                  <FontAwesome6 name="clipboard-check" size={18} color="#D93A6A" />
+                </View>
+              </View>
+
+              <View className="mt-6 gap-3">
+                <View className="rounded-2xl bg-[#FFF2F6] px-4 py-4">
+                  <Text className="text-xs font-semibold uppercase tracking-[1.5px] text-[#B35A7A]">Today’s Focus Time</Text>
+                  <Text className="mt-2 text-3xl font-bold text-[#24171D]">{reportData?.totalMins ?? 0} min</Text>
+                </View>
+                <View className="rounded-2xl bg-[#F7F3FF] px-4 py-4">
+                  <Text className="text-xs font-semibold uppercase tracking-[1.5px] text-[#6D5AA0]">Problems Solved</Text>
+                  <Text className="mt-2 text-3xl font-bold text-[#2A1F4A]">{reportData?.totalSolved ?? 0}</Text>
+                </View>
+              </View>
+
+              <View className="mt-6 rounded-2xl border border-[#F0E4EA] bg-[#FFFCFD] px-4 py-4">
+                <View className="flex-row items-center justify-between">
+                  <Text className="text-xs font-semibold uppercase tracking-[1.5px] text-[#8D6A79]">Subject Breakdown</Text>
+                  <Text className="text-xs text-[#9C7B88]">{totalSubjectsSolved} solved</Text>
+                </View>
+                <View className="mt-3 gap-2">
+                  {reportBreakdownRows.length > 0 ? (
+                    reportBreakdownRows.map((item) => (
+                      <View key={item.key} className="flex-row items-center justify-between rounded-xl bg-[#FFF3F7] px-3 py-2">
+                        <Text className="text-sm font-medium text-[#4A3440]">{item.label}</Text>
+                        <Text className="text-sm font-semibold text-[#B84370]">{item.value}</Text>
+                      </View>
+                    ))
+                  ) : (
+                    <Text className="text-sm text-[#8D7280]">No solved problems recorded today.</Text>
+                  )}
+                </View>
+              </View>
+            </View>
+
+            <View className="mt-5 gap-3">
+              <TouchableOpacity
+                activeOpacity={0.88}
+                onPress={() => {
+                  void handleShareReport();
+                }}
+                className="items-center justify-center rounded-2xl bg-[#D93A6A] px-4 py-4"
+              >
+                <Text className="text-base font-semibold text-white">Share to IG/TikTok</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.88}
+                onPress={() => {
+                  setShowReportCard(false);
+                  router.push('/');
+                }}
+                className="items-center justify-center rounded-2xl border border-[#E7D4DC] bg-white px-4 py-4"
+              >
+                <Text className="text-base font-semibold text-[#6D5A63]">Back to Home</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
 
       <ConfettiCelebration
         visible={Boolean(celebration)}
