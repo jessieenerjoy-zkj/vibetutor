@@ -445,10 +445,9 @@ export default function ProfileScreen() {
           />
 
           <View
-            className="rounded-[32px] border px-5 pb-6 pt-4 mb-5"
+            className="rounded-[32px] px-5 pb-5 pt-3 mb-4"
             style={{
               ...CARD_SHADOW,
-              borderColor: TOKENS.colors.borderSoft,
               backgroundColor: TOKENS.colors.surface,
             }}
           >
@@ -461,18 +460,17 @@ export default function ProfileScreen() {
               </Text>
             </View>
 
-            <View className="items-center mt-7">
+            <View className="items-center mt-6">
               <View
-                className="w-24 h-24 rounded-full border-[3px] items-center justify-center"
+                className="w-24 h-24 rounded-full items-center justify-center"
                 style={{
-                  borderColor: TOKENS.colors.borderSoft,
                   backgroundColor: TOKENS.colors.surfaceMuted,
                 }}
               >
                 <FontAwesome6 name="user" size={35} color={TOKENS.colors.mutedText} />
               </View>
 
-              <Text className="text-[20px] leading-[28px] font-semibold mt-5 text-center" style={{ color: TOKENS.colors.text }}>
+              <Text className="text-[20px] leading-[28px] font-semibold mt-4 text-center" style={{ color: TOKENS.colors.text }}>
                 Alex W
               </Text>
             </View>
