@@ -906,15 +906,15 @@ app.post('/api/v1/insight', async (req, res) => {
     const { mood, drops, minutes } = req.body;
 
     const content = await generateText({
-      systemPrompt: 'You are an encouraging AI learning assistant. Generate a short, warm insight sentence based on the user\'s mood and progress. Keep it under 30 words in Chinese. Be gentle and supportive.',
-      message: `Mood: ${mood || 'Unknown'}, Drops completed: ${drops || 0}/10, Study minutes today: ${minutes || 0}. Generate an encouraging sentence in Chinese.`,
+      systemPrompt: 'You are an encouraging AI learning assistant. Generate a short, warm insight sentence based on the user\'s mood and progress. Keep it under 30 words in English. Be gentle and supportive. English only.',
+      message: `Mood: ${mood || 'Unknown'}, Drops completed: ${drops || 0}/10, Study minutes today: ${minutes || 0}. Generate an encouraging sentence in English.`,
       temperature: 0.8,
     });
 
     res.json({ content });
   } catch (error) {
     console.error('Insight error:', error);
-    res.status(500).json({ content: '今天也要加油哦!' });
+    res.status(500).json({ content: 'Keep going. You are making steady progress today!' });
   }
 });
 

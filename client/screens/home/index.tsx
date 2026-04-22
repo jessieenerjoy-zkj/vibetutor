@@ -746,7 +746,7 @@ export default function HomeScreen() {
                 <View style={styles.insightIconWrap}>
                   <FontAwesome6 name="lightbulb" size={20} color="#ffffff" />
                 </View>
-                <Text style={styles.insightTitle}>MUSE INSIGHT</Text>
+                <Text style={styles.insightTitle}>AI Study Insight</Text>
               </View>
 
               <Text style={styles.insightCopy}>{insightBody}</Text>
@@ -756,7 +756,7 @@ export default function HomeScreen() {
                 onPress={handlePrimaryTutorPress}
                 style={styles.insightButton}
               >
-                <Text style={styles.insightButtonText}>START PRACTICE SET</Text>
+                <Text style={styles.insightButtonText}>Start Learning</Text>
               </TouchableOpacity>
             </Reanimated.View>
           </View>
