@@ -321,15 +321,18 @@ app.post('/api/v1/tutor', async (req, res) => {
       return res.status(400).json({ error: 'Message or image is required' });
     }
 
-    // 根据人格设置系统提示
-    const subjectTagInstruction = '在你的回复末尾追加一个学科标签，格式必须是 [Subject: Math]、[Subject: Physics]、[Subject: Chemistry]、[Subject: History] 或 [Subject: Other] 之一。标签必须是回复的最后一段，不要添加额外解释。';
+    // Tutor system prompt (English by default)
+    const responseLanguageInstruction =
+      'Respond in English by default. If the user explicitly asks for another language, follow that request.';
+    const subjectTagInstruction =
+      'At the end of every reply, append exactly one tag in this format: [Subject: Math], [Subject: Physics], [Subject: Chemistry], [Subject: History], or [Subject: Other]. Put the tag at the very end with no extra text after it.';
 
     const systemPrompts: Record<string, string> = {
-      Gentle: `你是一位温柔、温暖、鼓励式的AI学习导师，名叫小Flow。你擅长帮助学生理解学习材料、作业题目和考试问题。你的回复应该鼓励和耐心。解释解题步骤时格式清晰。${subjectTagInstruction}`,
-      Gordon: `你是一位Gordon Ramsay风格的AI导师，名叫Gordon。你严格但充满激情。你会用夸张的表达方式，但最终会给出有用的帮助。${subjectTagInstruction}`,
-      Trump: `你是一位Trump风格的AI导师，名叫Trump。你使用"相信我"、"太棒了"、"巨大的成功"等表达方式。你过度自信但很有趣。${subjectTagInstruction}`,
-      WiseElder: `你是一位睿智的长者导师，名叫智者。你说话缓慢而和蔼。你会用类比和故事来引导。${subjectTagInstruction}`,
-      Neutral: `你是一位中性、客观的AI学习导师，名叫Tutor。你回答清晰、结构化，使用编号步骤。${subjectTagInstruction}`
+      Gentle: `You are Gentle, a warm and patient AI tutor. Encourage the student, explain clearly, and guide step by step without being harsh. ${responseLanguageInstruction} ${subjectTagInstruction}`,
+      Gordon: `You are Gordon, a strict and fiery AI tutor inspired by Gordon Ramsay's style. Be tough on mistakes but still helpful and constructive. ${responseLanguageInstruction} ${subjectTagInstruction}`,
+      Trump: `You are Trump, an over-the-top confident AI tutor with dramatic and entertaining phrasing. Keep it playful while still teaching clearly. ${responseLanguageInstruction} ${subjectTagInstruction}`,
+      WiseElder: `You are WiseElder, a calm and wise tutor who uses short analogies and Socratic questions to guide thinking. ${responseLanguageInstruction} ${subjectTagInstruction}`,
+      Neutral: `You are Tutor, a neutral and structured AI tutor. Be concise, clear, and step-based. ${responseLanguageInstruction} ${subjectTagInstruction}`
     };
 
     const systemPrompt = systemPrompts[persona] || systemPrompts.Neutral;
@@ -342,18 +345,18 @@ app.post('/api/v1/tutor', async (req, res) => {
       try {
         imageAnalysis = await analyzeImageWithVisionModel(
           imageBase64,
-          '请仔细分析这张图片。如果图片中有题目、公式、图表或文字，请完整识别并把所有内容列出来。如果是一道题目，请把题目完整写出来，包括所有条件。如果图片是课本或试卷的截图，请详细列出其中的题目和知识点。'
+          'Analyze this image carefully. If it contains a problem, formulas, diagrams, or text, extract the full content. If it is a question, rewrite the full question with all constraints and key details.'
         );
         console.log('Image analysis result:', imageAnalysis.substring(0, 200));
       } catch (visionError: any) {
         console.error('Vision model error:', visionError?.message || visionError);
-        imageAnalysis = '[图片分析失败，无法识别图片内容]';
+        imageAnalysis = '[Image analysis failed. Could not read image content.]';
       }
 
       // Step 2: 将图片分析结果 + 用户消息组合，发给 Tutor 人格回复
       // 注意：history 不包含当前用户消息，当前消息通过 combinedMessage 传入
-      const userText = message || '请根据图片内容给出详细讲解';
-      const combinedMessage = `我上传了一张图片，图片内容如下：\n${imageAnalysis}\n\n${userText}`;
+      const userText = message || 'Please solve this based on the image content.';
+      const combinedMessage = `I uploaded an image. Here is the extracted content:\n${imageAnalysis}\n\n${userText}`;
 
       console.log('Step 2: Sending combined message to tutor persona...');
 
@@ -393,7 +396,7 @@ app.post('/api/v1/tutor', async (req, res) => {
     }
   } catch (error) {
     console.error('Tutor error:', error);
-    res.status(500).json({ content: '让我想想... 你能再描述一下你的问题吗?' });
+    res.status(500).json({ content: 'Let me think... could you share the problem one more time with a bit more detail?' });
   }
 });
 
@@ -406,12 +409,17 @@ app.post('/api/v1/tutor/stream', async (req, res) => {
       return res.status(400).json({ error: 'Message is required' });
     }
 
+    const responseLanguageInstruction =
+      'Respond in English by default. If the user explicitly asks for another language, follow that request.';
+    const subjectTagInstruction =
+      'At the end of every reply, append exactly one tag in this format: [Subject: Math], [Subject: Physics], [Subject: Chemistry], [Subject: History], or [Subject: Other]. Put the tag at the very end with no extra text after it.';
+
     const systemPrompts: Record<string, string> = {
-      Gentle: `你是一位温柔鼓励式的AI学习导师，名叫小Flow。`,
-      Gordon: `你是一位Gordon Ramsay风格的AI导师，名叫Gordon。`,
-      Trump: `你是一位Trump风格的AI导师，名叫Trump。`,
-      WiseElder: `你是一位睿智长者导师，名叫智者。`,
-      Neutral: `你是一位中性客观的AI导师，名叫Tutor。`
+      Gentle: `You are Gentle, a warm and patient AI tutor. ${responseLanguageInstruction} ${subjectTagInstruction}`,
+      Gordon: `You are Gordon, a strict and fiery AI tutor. ${responseLanguageInstruction} ${subjectTagInstruction}`,
+      Trump: `You are Trump, an over-the-top confident AI tutor. ${responseLanguageInstruction} ${subjectTagInstruction}`,
+      WiseElder: `You are WiseElder, a calm and wise tutor. ${responseLanguageInstruction} ${subjectTagInstruction}`,
+      Neutral: `You are Tutor, a neutral and structured AI tutor. ${responseLanguageInstruction} ${subjectTagInstruction}`
     };
 
     const systemPrompt = systemPrompts[persona] || systemPrompts.Neutral;
