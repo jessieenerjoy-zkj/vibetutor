@@ -318,7 +318,7 @@ export default function HomeScreen() {
               onPress={() => router.push('/profile')}
               style={styles.headerButton}
             >
-              <FontAwesome6 name="bell" solid size={18} color={UI.primary} />
+              <FontAwesome6 name="user" size={18} color={UI.primary} />
             </TouchableOpacity>
           </View>
         </View>
