@@ -39,21 +39,43 @@ interface StatCardProps {
   iconColor: string;
 }
 
+const TOKENS = {
+  colors: {
+    background: '#f8f9fb',
+    surface: '#ffffff',
+    surfaceSubtle: '#f2f4f6',
+    surfaceMuted: '#edeef0',
+    text: '#191c1e',
+    mutedText: '#5e3e3e',
+    border: '#e9bcbb',
+    borderSoft: '#e1e2e4',
+    primary: '#ff0040',
+    primaryMuted: '#ba002c',
+    secondary: '#5e39e0',
+    tertiary: '#2b59ad',
+    pinkOrb: 'rgba(233, 0, 58, 0.12)',
+    purpleOrb: 'rgba(119, 87, 250, 0.12)',
+    blueOrb: 'rgba(72, 114, 200, 0.12)',
+  },
+} as const;
+
 const CARD_SHADOW = {
-  shadowColor: '#251b2d',
-  shadowOffset: { width: 0, height: 6 },
-  shadowOpacity: 0.08,
-  shadowRadius: 16,
+  shadowColor: '#2e3132',
+  shadowOffset: { width: 0, height: 8 },
+  shadowOpacity: 0.05,
+  shadowRadius: 18,
   elevation: 2,
 };
 
 const StatCard = ({ title, value, icon, iconBackground, iconColor }: StatCardProps) => (
   <View
-    className="flex-1 rounded-3xl border border-[#d8d5df] bg-[#f7f6fa] px-3 py-4 items-center"
+    className="flex-1 rounded-[24px] border px-3 py-4 items-center"
     style={{
       ...CARD_SHADOW,
-      shadowOpacity: 0.05,
+      shadowOpacity: 0.04,
       shadowRadius: 12,
+      borderColor: TOKENS.colors.borderSoft,
+      backgroundColor: TOKENS.colors.surface,
     }}
   >
     <View
@@ -62,8 +84,15 @@ const StatCard = ({ title, value, icon, iconBackground, iconColor }: StatCardPro
     >
       <FontAwesome6 name={icon as any} size={15} color={iconColor} />
     </View>
-    <Text className="text-[42px] leading-[42px] font-bold text-[#17131d] tracking-tight">{value}</Text>
-    <Text className="text-[21px] leading-[22px] text-[#2a2630] mt-1 text-center">{title}</Text>
+    <Text className="text-[28px] leading-[36px] font-bold tracking-[-0.56px]" style={{ color: TOKENS.colors.text }}>
+      {value}
+    </Text>
+    <Text
+      className="text-[12px] leading-[16px] font-semibold tracking-[0.12px] mt-1 text-center"
+      style={{ color: TOKENS.colors.mutedText }}
+    >
+      {title}
+    </Text>
   </View>
 );
 
@@ -282,351 +311,438 @@ export default function ProfileScreen() {
   );
 
   return (
-    <Screen backgroundColor="#e8e6ee">
+    <Screen backgroundColor={TOKENS.colors.background}>
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 110 }}
       >
-        <View className="px-4 pt-3 pb-4">
+        <View className="px-5 pt-3">
           <View
-            className="rounded-[28px] border border-[#ebe9f0] bg-[#f7f6fa] px-5 pb-6 pt-4"
-            style={CARD_SHADOW}
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: -36,
+              left: -54,
+              width: 208,
+              height: 208,
+              borderRadius: 999,
+              backgroundColor: TOKENS.colors.pinkOrb,
+            }}
+          />
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: 134,
+              right: -68,
+              width: 220,
+              height: 220,
+              borderRadius: 999,
+              backgroundColor: TOKENS.colors.purpleOrb,
+            }}
+          />
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: 446,
+              left: -82,
+              width: 240,
+              height: 240,
+              borderRadius: 999,
+              backgroundColor: TOKENS.colors.blueOrb,
+            }}
+          />
+
+          <View
+            className="rounded-[32px] border px-5 pb-6 pt-4 mb-5"
+            style={{
+              ...CARD_SHADOW,
+              borderColor: TOKENS.colors.borderSoft,
+              backgroundColor: TOKENS.colors.surface,
+            }}
           >
             <View className="flex-row items-center justify-between">
-              <View className="w-9 h-9 rounded-xl bg-[#eceaf2] items-center justify-center">
-                <FontAwesome6 name="bars" size={15} color="#313046" />
+              <View className="w-9 h-9 rounded-xl items-center justify-center" style={{ backgroundColor: TOKENS.colors.surfaceSubtle }}>
+                <FontAwesome6 name="bars" size={15} color={TOKENS.colors.text} />
               </View>
-              <Text className="text-[34px] leading-[36px] font-semibold text-[#ff0a47] tracking-tight">Profile</Text>
-              <View className="w-9 h-9 rounded-xl bg-[#eceaf2] items-center justify-center">
-                <FontAwesome6 name="gear" size={16} color="#313046" />
+              <Text
+                className="text-[28px] leading-[36px] font-bold tracking-[-0.56px]"
+                style={{ color: TOKENS.colors.primary }}
+              >
+                Profile
+              </Text>
+              <View className="w-9 h-9 rounded-xl items-center justify-center" style={{ backgroundColor: TOKENS.colors.surfaceSubtle }}>
+                <FontAwesome6 name="gear" size={16} color={TOKENS.colors.text} />
               </View>
             </View>
 
             <View className="items-center mt-7">
-              <View className="w-24 h-24 rounded-full border-[3px] border-[#ecebf1] bg-[#d9d8df] items-center justify-center">
-                <FontAwesome6 name="user" size={35} color="#5a5760" />
+              <View
+                className="w-24 h-24 rounded-full border-[3px] items-center justify-center"
+                style={{
+                  borderColor: TOKENS.colors.borderSoft,
+                  backgroundColor: TOKENS.colors.surfaceMuted,
+                }}
+              >
+                <FontAwesome6 name="user" size={35} color={TOKENS.colors.mutedText} />
               </View>
 
-              <Text className="text-[21px] leading-[24px] text-[#2b2631] mt-5 text-center">
+              <Text className="text-[14px] leading-[20px] mt-5 text-center" style={{ color: TOKENS.colors.mutedText }}>
                 Track your learning journey
               </Text>
 
-              <View className="mt-4 rounded-full px-4 py-2 bg-[#efedf4] flex-row items-center">
-                <View className="w-2 h-2 rounded-full bg-[#ff0a47] mr-2" />
-                <Text className="text-[19px] leading-[20px] text-[#625d6c]">
+              <View className="mt-4 rounded-full px-4 py-2 flex-row items-center" style={{ backgroundColor: TOKENS.colors.surfaceSubtle }}>
+                <View className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: TOKENS.colors.primary }} />
+                <Text className="text-[14px] leading-[20px]" style={{ color: TOKENS.colors.mutedText }}>
                   Today Drops {todayDrops}/{DAILY_DROP_LIMIT}
                 </Text>
               </View>
             </View>
           </View>
-        </View>
 
-        <View className="px-4 mb-6">
-          <Text className="text-[35px] leading-[38px] font-semibold text-[#16121c] mb-4">My Study Stats</Text>
-          <View
-            className="rounded-[30px] border border-[#e5e2eb] bg-[#f8f7fa] px-4 py-4"
-            style={CARD_SHADOW}
-          >
-            <View className="flex-row gap-3">
-              <StatCard
-                title="Total Drops"
-                value={totalDrops}
-                icon="droplet"
-                iconBackground="#ffd7e0"
-                iconColor="#d31646"
-              />
-              <StatCard
-                title="Study Days"
-                value={totalDays}
-                icon="calendar"
-                iconBackground="#e3ddff"
-                iconColor="#5a31f4"
-              />
-              <StatCard
-                title="Study Time"
-                value={formatStudyDuration(studyMinutes)}
-                icon="stopwatch"
-                iconBackground="#dae7ff"
-                iconColor="#2457ba"
-              />
+          <View className="mb-5">
+            <Text className="text-[20px] leading-[28px] font-semibold mb-3" style={{ color: TOKENS.colors.text }}>
+              My Study Stats
+            </Text>
+            <View
+              className="rounded-[24px] border p-4"
+              style={{
+                ...CARD_SHADOW,
+                borderColor: TOKENS.colors.borderSoft,
+                backgroundColor: TOKENS.colors.surface,
+              }}
+            >
+              <View className="flex-row gap-3">
+                <StatCard
+                  title="Total Drops"
+                  value={totalDrops}
+                  icon="droplet"
+                  iconBackground="#ffe3ea"
+                  iconColor={TOKENS.colors.primaryMuted}
+                />
+                <StatCard
+                  title="Study Days"
+                  value={totalDays}
+                  icon="calendar"
+                  iconBackground="#ece5ff"
+                  iconColor={TOKENS.colors.secondary}
+                />
+                <StatCard
+                  title="Study Time"
+                  value={formatStudyDuration(studyMinutes)}
+                  icon="stopwatch"
+                  iconBackground="#e0ebff"
+                  iconColor={TOKENS.colors.tertiary}
+                />
+              </View>
             </View>
           </View>
-        </View>
 
-        <View className="px-4 mb-6">
-          <Text className="text-[35px] leading-[38px] font-semibold text-[#16121c] mb-4">Mind Garden</Text>
-          <View
-            className="rounded-[30px] border border-[#e5e2eb] bg-[#f8f7fa] p-4"
-            style={CARD_SHADOW}
-          >
-            <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-[21px] leading-[24px] font-semibold text-[#4d4756]">
-                Mind Garden
-              </Text>
-              <Text className="text-[19px] leading-[20px] text-[#8f879c]">
-                {mindGardenState.completed ? 'All stamps unlocked' : 'Sequential unlock'}
-              </Text>
-            </View>
+          <View className="mb-5">
+            <Text className="text-[20px] leading-[28px] font-semibold mb-3" style={{ color: TOKENS.colors.text }}>
+              Mind Garden
+            </Text>
+            <View
+              className="rounded-[24px] border p-4"
+              style={{
+                ...CARD_SHADOW,
+                borderColor: TOKENS.colors.borderSoft,
+                backgroundColor: TOKENS.colors.surface,
+              }}
+            >
+              <View className="flex-row items-center justify-between mb-4">
+                <Text className="text-[20px] leading-[28px] font-semibold" style={{ color: TOKENS.colors.text }}>
+                  Mind Garden
+                </Text>
+                <Text className="text-[12px] leading-[16px] font-semibold" style={{ color: TOKENS.colors.mutedText }}>
+                  {mindGardenState.completed ? 'All stamps unlocked' : 'Sequential unlock'}
+                </Text>
+              </View>
 
-            <View className="flex-row flex-wrap justify-between gap-y-6 pt-1">
-              {mindGardenState.stamps.map((stamp) => {
-                const progressRatio = Math.min(1, stamp.progressDays / stamp.targetDays);
-                return (
-                  <TouchableOpacity
-                    key={stamp.key}
-                    activeOpacity={0.85}
-                    onPress={() => setSelectedStamp(stamp)}
-                    className="w-[48%] rounded-[20px] px-3 py-3 items-center"
-                    style={{
-                      backgroundColor: stamp.unlocked ? `${stamp.accentColor}10` : '#f4f3f8',
-                      borderWidth: 1,
-                      borderColor: stamp.unlocked ? `${stamp.accentColor}38` : '#dfdce6',
-                    }}
-                  >
-                    <View
-                      className="w-[72px] h-[72px] rounded-full items-center justify-center mb-2"
+              <View className="flex-row flex-wrap justify-between gap-y-4 pt-1">
+                {mindGardenState.stamps.map((stamp) => {
+                  const progressRatio = Math.min(1, stamp.progressDays / stamp.targetDays);
+                  return (
+                    <TouchableOpacity
+                      key={stamp.key}
+                      activeOpacity={0.85}
+                      onPress={() => setSelectedStamp(stamp)}
+                      className="w-[48%] rounded-[24px] px-3 py-3 items-center"
                       style={{
-                        backgroundColor: stamp.unlocked ? `${stamp.accentColor}16` : '#f0eef4',
-                        borderWidth: 2,
-                        borderStyle: 'dashed',
-                        borderColor: stamp.unlocked ? `${stamp.accentColor}5a` : '#bdb9c8',
+                        backgroundColor: stamp.unlocked ? `${stamp.accentColor}10` : TOKENS.colors.surfaceSubtle,
+                        borderWidth: 1,
+                        borderColor: stamp.unlocked ? `${stamp.accentColor}35` : TOKENS.colors.borderSoft,
                       }}
                     >
-                      <FontAwesome6
-                        name={stamp.icon as any}
-                        size={23}
-                        color={stamp.unlocked ? stamp.accentColor : '#9CA3AF'}
-                      />
-                    </View>
-                    <Text className="text-[20px] leading-[22px] text-[#5a5564]">
-                      {stamp.englishLabel}
-                    </Text>
-                    <View className="w-12 h-[3px] rounded-full bg-[#ddd9e3] mt-2" />
-                    <Text className="text-[17px] leading-[18px] text-[#8d8698] mt-2 text-center">
-                      {stamp.unlocked ? `Unlocked · ${formatShortDate(stamp.unlockDate)}` : `${stamp.progressDays}/${stamp.targetDays} days`}
-                    </Text>
-                    <View className="mt-2 h-[6px] rounded-full bg-[#ebe7f0] overflow-hidden w-full">
                       <View
-                        className="h-full rounded-full"
+                        className="w-[72px] h-[72px] rounded-full items-center justify-center mb-2"
                         style={{
-                          width: `${progressRatio * 100}%`,
-                          backgroundColor: stamp.unlocked ? stamp.accentColor : '#aaa4b5',
+                          backgroundColor: stamp.unlocked ? `${stamp.accentColor}16` : '#eceef2',
+                          borderWidth: 2,
+                          borderStyle: 'dashed',
+                          borderColor: stamp.unlocked ? `${stamp.accentColor}55` : '#b8bfc9',
                         }}
+                      >
+                        <FontAwesome6
+                          name={stamp.icon as any}
+                          size={23}
+                          color={stamp.unlocked ? stamp.accentColor : '#9198a3'}
+                        />
+                      </View>
+                      <Text className="text-[14px] leading-[20px]" style={{ color: TOKENS.colors.text }}>
+                        {stamp.englishLabel}
+                      </Text>
+                      <View className="w-12 h-[3px] rounded-full mt-2" style={{ backgroundColor: TOKENS.colors.borderSoft }} />
+                      <Text className="text-[12px] leading-[16px] font-semibold mt-2 text-center" style={{ color: TOKENS.colors.mutedText }}>
+                        {stamp.unlocked ? `Unlocked · ${formatShortDate(stamp.unlockDate)}` : `${stamp.progressDays}/${stamp.targetDays} days`}
+                      </Text>
+                      <View className="mt-2 h-[6px] rounded-full overflow-hidden w-full" style={{ backgroundColor: '#e5e8ee' }}>
+                        <View
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${progressRatio * 100}%`,
+                            backgroundColor: stamp.unlocked ? stamp.accentColor : '#9aa1ad',
+                          }}
+                        />
+                      </View>
+                      {stamp.isCurrent && !stamp.unlocked ? (
+                        <Text className="text-[12px] leading-[16px] font-semibold mt-2" style={{ color: stamp.accentColor }}>
+                          Current challenge
+                        </Text>
+                      ) : null}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <View className="mt-5 rounded-2xl border px-4 py-4" style={{ borderColor: TOKENS.colors.borderSoft, backgroundColor: TOKENS.colors.surfaceSubtle }}>
+                {focusStamp ? (
+                  <Text className="text-[12px] leading-[16px] font-semibold" style={{ color: TOKENS.colors.mutedText }}>
+                    {focusStamp.progressDays}/{focusStamp.targetDays}
+                  </Text>
+                ) : null}
+
+                <View className="mt-2 h-[7px] rounded-full overflow-hidden" style={{ backgroundColor: '#dfe5ea' }}>
+                  <View
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${focusProgressRatio * 100}%`,
+                      backgroundColor: focusStamp?.accentColor || '#99a0ab',
+                    }}
+                  />
+                </View>
+
+                <Text className="text-[16px] leading-[24px] font-medium mt-4" style={{ color: TOKENS.colors.text }}>
+                  {resolvedSelectedStamp
+                    ? `Current target · ${resolvedSelectedStamp.englishLabel}`
+                    : currentStage
+                      ? `Current target · ${currentStage.englishLabel}`
+                      : 'Mind Garden complete'}
+                </Text>
+                <Text className="text-[14px] leading-[20px] mt-2" style={{ color: TOKENS.colors.mutedText }}>
+                  {resolvedSelectedStamp
+                    ? getStampRequirementCopy(resolvedSelectedStamp)
+                    : currentStage
+                      ? `Fill Learning Drop to ${DAILY_DROP_LIMIT}/${DAILY_DROP_LIMIT} on ${currentStage.targetDays} qualified day(s). Progress only increases on full-goal days.`
+                      : 'You have completed all four stages. Keep learning to maintain your rhythm.'}
+                </Text>
+                {resolvedSelectedStamp ? (
+                  <Text className="text-[12px] leading-[16px] font-semibold mt-3" style={{ color: resolvedSelectedStamp.accentColor }}>
+                    {getStampStatusCopy(resolvedSelectedStamp)}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+          </View>
+
+          <View className="mb-5">
+            <Text className="text-[20px] leading-[28px] font-semibold mb-3" style={{ color: TOKENS.colors.text }}>
+              Mood Trend
+            </Text>
+            <View
+              className="rounded-[24px] border p-4"
+              style={{
+                ...CARD_SHADOW,
+                borderColor: TOKENS.colors.borderSoft,
+                backgroundColor: TOKENS.colors.surface,
+              }}
+            >
+              <View className="flex-row items-center justify-between mb-4">
+                <Text className="text-[16px] leading-[24px] font-medium" style={{ color: TOKENS.colors.text }}>
+                  Mood Trend · Last 7 Days
+                </Text>
+                <View className="rounded-full px-3 py-1.5" style={{ backgroundColor: TOKENS.colors.surfaceSubtle }}>
+                  <Text className="text-[12px] leading-[16px] font-semibold" style={{ color: TOKENS.colors.mutedText }}>
+                    Last 7 Days
+                  </Text>
+                </View>
+              </View>
+
+              <View className="flex-row justify-between items-end mb-5 px-1">
+                {moodTrend.map((item, index) => (
+                  <View key={item.date} className="items-center">
+                    <View className="w-9 h-9 rounded-full items-center justify-center mb-1.5" style={{ backgroundColor: TOKENS.colors.surfaceSubtle }}>
+                      <FontAwesome6
+                        name={MOOD_CONFIG[item.mood].icon as any}
+                        size={17}
+                        color={MOOD_CONFIG[item.mood].color}
                       />
                     </View>
-                    {stamp.isCurrent && !stamp.unlocked ? (
-                      <Text className="text-[16px] leading-[17px] mt-2" style={{ color: stamp.accentColor }}>
-                        Current challenge
-                      </Text>
-                    ) : null}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <View className="mt-5 rounded-2xl border border-[#dedbe4] bg-[#f5f3f8] px-4 py-4">
-              {focusStamp ? (
-                <Text className="text-[21px] leading-[22px] font-semibold text-[#292531]">
-                  {focusStamp.progressDays}/{focusStamp.targetDays}
-                </Text>
-              ) : null}
-
-              <View className="mt-2 h-[7px] rounded-full bg-[#e4e0e9] overflow-hidden">
-                <View
-                  className="h-full rounded-full"
-                  style={{
-                    width: `${focusProgressRatio * 100}%`,
-                    backgroundColor: focusStamp?.accentColor || '#a09aa9',
-                  }}
-                />
-              </View>
-
-              <Text className="text-[22px] leading-[24px] font-semibold text-[#2c2735] mt-4">
-                {resolvedSelectedStamp
-                  ? `Current target · ${resolvedSelectedStamp.englishLabel}`
-                  : currentStage
-                    ? `Current target · ${currentStage.englishLabel}`
-                    : 'Mind Garden complete'}
-              </Text>
-              <Text className="text-[17px] leading-[24px] text-[#7e778d] mt-2">
-                {resolvedSelectedStamp
-                  ? getStampRequirementCopy(resolvedSelectedStamp)
-                  : currentStage
-                    ? `Fill Learning Drop to ${DAILY_DROP_LIMIT}/${DAILY_DROP_LIMIT} on ${currentStage.targetDays} qualified day(s). Progress only increases on full-goal days.`
-                    : 'You have completed all four stages. Keep learning to maintain your rhythm.'}
-              </Text>
-              {resolvedSelectedStamp ? (
-                <Text className="text-[17px] leading-[18px] mt-3" style={{ color: resolvedSelectedStamp.accentColor }}>
-                  {getStampStatusCopy(resolvedSelectedStamp)}
-                </Text>
-              ) : null}
-            </View>
-          </View>
-        </View>
-
-        <View className="px-4 mb-6">
-          <Text className="text-[35px] leading-[38px] font-semibold text-[#16121c] mb-4">Mood Trend</Text>
-          <View
-            className="rounded-[30px] border border-[#e5e2eb] bg-[#f8f7fa] p-4"
-            style={CARD_SHADOW}
-          >
-            <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-[21px] leading-[24px] font-semibold text-[#4d4756]">
-                Mood Trend · Last 7 Days
-              </Text>
-              <View className="rounded-full bg-[#edeaf3] px-3 py-1.5">
-                <Text className="text-[16px] leading-[17px] text-[#6f687c]">Last 7 Days</Text>
-              </View>
-            </View>
-
-            <View className="flex-row justify-between items-end mb-5 px-1">
-              {moodTrend.map((item, index) => (
-                <View key={item.date} className="items-center">
-                  <View className="w-9 h-9 rounded-full bg-[#efedf4] items-center justify-center mb-1.5">
-                    <FontAwesome6
-                      name={MOOD_CONFIG[item.mood].icon as any}
-                      size={17}
-                      color={MOOD_CONFIG[item.mood].color}
-                    />
-                  </View>
-                  <Text className="text-[16px] leading-[16px] text-[#867f93]">
-                    {index === 6 ? 'Today' : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][index]}
-                  </Text>
-                </View>
-              ))}
-            </View>
-
-            <View className="flex-row justify-center gap-4 pt-3 border-t border-[#e4e1ea]">
-              {(Object.keys(MOOD_CONFIG) as MoodType[]).map((mood) => (
-                <View key={mood} className="flex-row items-center">
-                  <FontAwesome6 name={MOOD_CONFIG[mood].icon as any} size={10} color={MOOD_CONFIG[mood].color} />
-                  <Text className="text-[15px] leading-[16px] text-[#8a8396] ml-1">
-                    {MOOD_CONFIG[mood].label}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        </View>
-
-        <View className="px-4 mb-6">
-          <Text className="text-[35px] leading-[38px] font-semibold text-[#16121c] mb-4">Mood Distribution</Text>
-          <View
-            className="rounded-[30px] border border-[#e5e2eb] bg-[#f8f7fa] p-4"
-            style={CARD_SHADOW}
-          >
-            <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-[21px] leading-[24px] font-semibold text-[#4d4756]">
-                Mood Distribution
-              </Text>
-              <Text className="text-[17px] leading-[18px] text-[#8f879c]">
-                {moodHistory.length} total records
-              </Text>
-            </View>
-
-            <View className="items-center justify-center rounded-[24px] border border-[#e2d9df] bg-[#f6f2f5] py-4">
-              <Svg width={RADAR_SIZE} height={RADAR_SIZE}>
-                {radarGridPolygons.map((points, index) => (
-                  <Polygon
-                    key={`grid-${index}`}
-                    points={points}
-                    fill={index === RADAR_LEVELS - 1 ? '#f9f3f5' : 'transparent'}
-                    stroke="#cfccd6"
-                    strokeWidth={1}
-                  />
-                ))}
-
-                {radarAxes.map((axis) => (
-                  <Line
-                    key={`axis-${axis.mood}`}
-                    x1={RADAR_CENTER}
-                    y1={RADAR_CENTER}
-                    x2={axis.outerX}
-                    y2={axis.outerY}
-                    stroke="#cfccd6"
-                    strokeWidth={1}
-                  />
-                ))}
-
-                <Polygon
-                  points={radarPolygonPoints}
-                  fill="rgba(255, 10, 71, 0.2)"
-                  stroke="#ff0a47"
-                  strokeWidth={2.5}
-                />
-
-                {radarAxes.map((axis) => (
-                  <Circle
-                    key={`point-${axis.mood}`}
-                    cx={axis.pointX}
-                    cy={axis.pointY}
-                    r={4.5}
-                    fill="#ff0a47"
-                    stroke="#fff"
-                    strokeWidth={2}
-                  />
-                ))}
-
-                {radarAxes.map((axis) => (
-                  <SvgText
-                    key={`label-${axis.mood}`}
-                    x={axis.labelX}
-                    y={axis.labelY}
-                    fontSize="11"
-                    fontWeight="600"
-                    fill="#5a5465"
-                    textAnchor="middle"
-                  >
-                    {MOOD_CONFIG[axis.mood].label}
-                  </SvgText>
-                ))}
-              </Svg>
-            </View>
-
-            <View className="flex-row flex-wrap justify-between gap-y-3 mt-4">
-              {MOOD_ORDER.map((mood) => (
-                <View
-                  key={mood}
-                  className="w-[48%] rounded-2xl px-3 py-3 bg-[#f1eef4] border border-[#e3dfe8]"
-                >
-                  <View className="flex-row items-center justify-between">
-                    <View className="flex-row items-center flex-1 pr-2">
-                      <FontAwesome6 name={MOOD_CONFIG[mood].icon as any} size={13} color={MOOD_CONFIG[mood].color} />
-                      <Text className="text-[18px] leading-[20px] text-[#2f2a37] ml-2">
-                        {MOOD_CONFIG[mood].label}
-                      </Text>
-                    </View>
-                    <Text className="text-[18px] leading-[20px] font-semibold text-[#7e778d]">
-                      {moodDistribution[mood]}
+                    <Text className="text-[12px] leading-[16px] font-semibold" style={{ color: TOKENS.colors.mutedText }}>
+                      {index === 6 ? 'Today' : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][index]}
                     </Text>
                   </View>
-                </View>
-              ))}
+                ))}
+              </View>
+
+              <View className="flex-row justify-center gap-4 pt-3 border-t" style={{ borderColor: TOKENS.colors.borderSoft }}>
+                {(Object.keys(MOOD_CONFIG) as MoodType[]).map((mood) => (
+                  <View key={mood} className="flex-row items-center">
+                    <FontAwesome6 name={MOOD_CONFIG[mood].icon as any} size={10} color={MOOD_CONFIG[mood].color} />
+                    <Text className="text-[12px] leading-[16px] font-semibold ml-1" style={{ color: TOKENS.colors.mutedText }}>
+                      {MOOD_CONFIG[mood].label}
+                    </Text>
+                  </View>
+                ))}
+              </View>
             </View>
           </View>
-        </View>
 
-        <View className="px-4 mb-6">
-          <View
-            className="rounded-[30px] border border-[#e5e2eb] bg-[#f8f7fa] overflow-hidden px-4 py-4"
-            style={CARD_SHADOW}
-          >
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => router.push('/tutor')}
-              className="rounded-2xl bg-[#ff0a47] px-5 py-4 items-center justify-center"
+          <View className="mb-5">
+            <Text className="text-[20px] leading-[28px] font-semibold mb-3" style={{ color: TOKENS.colors.text }}>
+              Mood Distribution
+            </Text>
+            <View
+              className="rounded-[24px] border p-4"
+              style={{
+                ...CARD_SHADOW,
+                borderColor: TOKENS.colors.borderSoft,
+                backgroundColor: TOKENS.colors.surface,
+              }}
             >
-              <Text className="text-[24px] leading-[26px] text-white font-semibold">Start Learning</Text>
-            </TouchableOpacity>
+              <View className="flex-row items-center justify-between mb-4">
+                <Text className="text-[16px] leading-[24px] font-medium" style={{ color: TOKENS.colors.text }}>
+                  Mood Distribution
+                </Text>
+                <Text className="text-[12px] leading-[16px] font-semibold" style={{ color: TOKENS.colors.mutedText }}>
+                  {moodHistory.length} total records
+                </Text>
+              </View>
 
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={handleClearData}
-              className="rounded-2xl border border-[#c9bbc2] bg-[#f2eff3] px-5 py-4 items-center justify-center mt-4"
+              <View className="items-center justify-center rounded-[24px] border py-4" style={{ borderColor: TOKENS.colors.borderSoft, backgroundColor: TOKENS.colors.surfaceSubtle }}>
+                <Svg width={RADAR_SIZE} height={RADAR_SIZE}>
+                  {radarGridPolygons.map((points, index) => (
+                    <Polygon
+                      key={`grid-${index}`}
+                      points={points}
+                      fill={index === RADAR_LEVELS - 1 ? '#f9f5f7' : 'transparent'}
+                      stroke="#d4d7dc"
+                      strokeWidth={1}
+                    />
+                  ))}
+
+                  {radarAxes.map((axis) => (
+                    <Line
+                      key={`axis-${axis.mood}`}
+                      x1={RADAR_CENTER}
+                      y1={RADAR_CENTER}
+                      x2={axis.outerX}
+                      y2={axis.outerY}
+                      stroke="#d4d7dc"
+                      strokeWidth={1}
+                    />
+                  ))}
+
+                  <Polygon
+                    points={radarPolygonPoints}
+                    fill="rgba(255, 0, 64, 0.18)"
+                    stroke={TOKENS.colors.primary}
+                    strokeWidth={2.5}
+                  />
+
+                  {radarAxes.map((axis) => (
+                    <Circle
+                      key={`point-${axis.mood}`}
+                      cx={axis.pointX}
+                      cy={axis.pointY}
+                      r={4.5}
+                      fill={TOKENS.colors.primary}
+                      stroke="#fff"
+                      strokeWidth={2}
+                    />
+                  ))}
+
+                  {radarAxes.map((axis) => (
+                    <SvgText
+                      key={`label-${axis.mood}`}
+                      x={axis.labelX}
+                      y={axis.labelY}
+                      fontSize="11"
+                      fontWeight="600"
+                      fill={TOKENS.colors.mutedText}
+                      textAnchor="middle"
+                    >
+                      {MOOD_CONFIG[axis.mood].label}
+                    </SvgText>
+                  ))}
+                </Svg>
+              </View>
+
+              <View className="flex-row flex-wrap justify-between gap-y-3 mt-4">
+                {MOOD_ORDER.map((mood) => (
+                  <View
+                    key={mood}
+                    className="w-[48%] rounded-2xl px-3 py-3 border"
+                    style={{ borderColor: TOKENS.colors.borderSoft, backgroundColor: TOKENS.colors.surfaceSubtle }}
+                  >
+                    <View className="flex-row items-center justify-between">
+                      <View className="flex-row items-center flex-1 pr-2">
+                        <FontAwesome6 name={MOOD_CONFIG[mood].icon as any} size={13} color={MOOD_CONFIG[mood].color} />
+                        <Text className="text-[14px] leading-[20px] ml-2" style={{ color: TOKENS.colors.text }}>
+                          {MOOD_CONFIG[mood].label}
+                        </Text>
+                      </View>
+                      <Text className="text-[12px] leading-[16px] font-semibold" style={{ color: TOKENS.colors.mutedText }}>
+                        {moodDistribution[mood]}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+
+          <View className="mb-6">
+            <View
+              className="rounded-[24px] border overflow-hidden p-4"
+              style={{
+                ...CARD_SHADOW,
+                borderColor: TOKENS.colors.borderSoft,
+                backgroundColor: TOKENS.colors.surface,
+              }}
             >
-              <Text className="text-[24px] leading-[26px] text-[#352b34] font-medium">Clear Data</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => router.push('/tutor')}
+                className="rounded-xl px-5 py-[16px] items-center justify-center"
+                style={{ backgroundColor: TOKENS.colors.primary }}
+              >
+                <Text className="text-[16px] leading-[24px] text-white font-semibold">Start Learning</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={handleClearData}
+                className="rounded-xl border px-5 py-[16px] items-center justify-center mt-4"
+                style={{ borderColor: TOKENS.colors.border, backgroundColor: TOKENS.colors.surface }}
+              >
+                <Text className="text-[16px] leading-[24px] font-semibold" style={{ color: TOKENS.colors.primaryMuted }}>
+                  Clear Data
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </ScrollView>
