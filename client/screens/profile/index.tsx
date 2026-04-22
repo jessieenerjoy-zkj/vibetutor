@@ -445,111 +445,79 @@ export default function ProfileScreen() {
               Mind Garden
             </Text>
             <View
-              className="rounded-[24px] border p-4"
+              className="rounded-[32px] border px-4 py-5"
               style={{
                 ...CARD_SHADOW,
                 borderColor: TOKENS.colors.borderSoft,
-                backgroundColor: TOKENS.colors.surface,
+                backgroundColor: '#f7f8fa',
               }}
             >
-              <View className="flex-row items-center justify-between mb-4">
-                <Text className="text-[20px] leading-[28px] font-semibold" style={{ color: TOKENS.colors.text }}>
-                  Mind Garden
-                </Text>
-                <Text className="text-[12px] leading-[16px] font-semibold" style={{ color: TOKENS.colors.mutedText }}>
-                  {mindGardenState.completed ? 'All stamps unlocked' : 'Sequential unlock'}
-                </Text>
-              </View>
-
-              <View className="flex-row flex-wrap justify-between gap-y-4 pt-1">
+              <View className="flex-row flex-wrap justify-between gap-y-8 pt-2 px-1">
                 {mindGardenState.stamps.map((stamp) => {
-                  const progressRatio = Math.min(1, stamp.progressDays / stamp.targetDays);
                   return (
                     <TouchableOpacity
                       key={stamp.key}
                       activeOpacity={0.85}
                       onPress={() => setSelectedStamp(stamp)}
-                      className="w-[48%] rounded-[24px] px-3 py-3 items-center"
-                      style={{
-                        backgroundColor: stamp.unlocked ? `${stamp.accentColor}10` : TOKENS.colors.surfaceSubtle,
-                        borderWidth: 1,
-                        borderColor: stamp.unlocked ? `${stamp.accentColor}35` : TOKENS.colors.borderSoft,
-                      }}
+                      className="w-[48%] rounded-[20px] px-2 py-1 items-center"
+                      style={{ backgroundColor: 'transparent' }}
                     >
                       <View
-                        className="w-[72px] h-[72px] rounded-full items-center justify-center mb-2"
+                        className="w-[84px] h-[84px] rounded-full items-center justify-center mb-3"
                         style={{
-                          backgroundColor: stamp.unlocked ? `${stamp.accentColor}16` : '#eceef2',
                           borderWidth: 2,
                           borderStyle: 'dashed',
-                          borderColor: stamp.unlocked ? `${stamp.accentColor}55` : '#b8bfc9',
+                          borderColor: stamp.unlocked ? `${stamp.accentColor}50` : '#bcbec5',
+                          backgroundColor: 'transparent',
                         }}
                       >
                         <FontAwesome6
                           name={stamp.icon as any}
-                          size={23}
-                          color={stamp.unlocked ? stamp.accentColor : '#9198a3'}
+                          size={26}
+                          color={stamp.unlocked ? stamp.accentColor : '#a4a6ad'}
                         />
                       </View>
-                      <Text className="text-[14px] leading-[20px]" style={{ color: TOKENS.colors.text }}>
+                      <Text className="text-[14px] leading-[20px]" style={{ color: '#6d6f76' }}>
                         {stamp.englishLabel}
                       </Text>
-                      <View className="w-12 h-[3px] rounded-full mt-2" style={{ backgroundColor: TOKENS.colors.borderSoft }} />
-                      <Text className="text-[12px] leading-[16px] font-semibold mt-2 text-center" style={{ color: TOKENS.colors.mutedText }}>
-                        {stamp.unlocked ? `Unlocked · ${formatShortDate(stamp.unlockDate)}` : `${stamp.progressDays}/${stamp.targetDays} days`}
-                      </Text>
-                      <View className="mt-2 h-[6px] rounded-full overflow-hidden w-full" style={{ backgroundColor: '#e5e8ee' }}>
-                        <View
-                          className="h-full rounded-full"
-                          style={{
-                            width: `${progressRatio * 100}%`,
-                            backgroundColor: stamp.unlocked ? stamp.accentColor : '#9aa1ad',
-                          }}
-                        />
-                      </View>
-                      {stamp.isCurrent && !stamp.unlocked ? (
-                        <Text className="text-[12px] leading-[16px] font-semibold mt-2" style={{ color: stamp.accentColor }}>
-                          Current challenge
-                        </Text>
-                      ) : null}
+                      <View className="w-14 h-[4px] rounded-full mt-2" style={{ backgroundColor: '#e2e4e9' }} />
                     </TouchableOpacity>
                   );
                 })}
               </View>
 
-              <View className="mt-5 rounded-2xl border px-4 py-4" style={{ borderColor: TOKENS.colors.borderSoft, backgroundColor: TOKENS.colors.surfaceSubtle }}>
+              <View
+                className="mt-7 rounded-[20px] border px-4 py-4"
+                style={{
+                  borderColor: '#d8dbe1',
+                  backgroundColor: '#f8f9fb',
+                }}
+              >
                 {focusStamp ? (
-                  <Text className="text-[12px] leading-[16px] font-semibold" style={{ color: TOKENS.colors.mutedText }}>
+                  <Text className="text-[30px] leading-[32px] font-semibold" style={{ color: '#2e3139' }}>
                     {focusStamp.progressDays}/{focusStamp.targetDays}
                   </Text>
                 ) : null}
 
-                <View className="mt-2 h-[7px] rounded-full overflow-hidden" style={{ backgroundColor: '#dfe5ea' }}>
+                <View className="mt-3 h-[8px] rounded-full overflow-hidden" style={{ backgroundColor: '#e1e3e8' }}>
                   <View
                     className="h-full rounded-full"
                     style={{
                       width: `${focusProgressRatio * 100}%`,
-                      backgroundColor: focusStamp?.accentColor || '#99a0ab',
+                      backgroundColor: focusStamp?.accentColor || '#bcc1cb',
                     }}
                   />
                 </View>
 
-                <Text className="text-[16px] leading-[24px] font-medium mt-4" style={{ color: TOKENS.colors.text }}>
+                <Text className="text-[14px] leading-[20px] font-medium mt-5" style={{ color: '#1f2229' }}>
                   {resolvedSelectedStamp
                     ? `Current target · ${resolvedSelectedStamp.englishLabel}`
                     : currentStage
                       ? `Current target · ${currentStage.englishLabel}`
                       : 'Mind Garden complete'}
                 </Text>
-                <Text className="text-[14px] leading-[20px] mt-2" style={{ color: TOKENS.colors.mutedText }}>
-                  {resolvedSelectedStamp
-                    ? getStampRequirementCopy(resolvedSelectedStamp)
-                    : currentStage
-                      ? `Fill Learning Drop to ${DAILY_DROP_LIMIT}/${DAILY_DROP_LIMIT} on ${currentStage.targetDays} qualified day(s). Progress only increases on full-goal days.`
-                      : 'You have completed all four stages. Keep learning to maintain your rhythm.'}
-                </Text>
                 {resolvedSelectedStamp ? (
-                  <Text className="text-[12px] leading-[16px] font-semibold mt-3" style={{ color: resolvedSelectedStamp.accentColor }}>
+                  <Text className="text-[12px] leading-[16px] font-semibold mt-2" style={{ color: resolvedSelectedStamp.accentColor }}>
                     {getStampStatusCopy(resolvedSelectedStamp)}
                   </Text>
                 ) : null}
