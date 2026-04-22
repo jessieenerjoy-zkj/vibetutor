@@ -141,6 +141,9 @@ const RADAR_LEVELS = 4;
 const SESSION_GAP_MINUTES = 30;
 const COUNTED_GAP_CAP_MINUTES = 5;
 const RADAR_ICON_SIZE = 28;
+const RADAR_LABEL_WIDTH = 118;
+const RADAR_LABEL_HEIGHT = 14;
+const RADAR_LABEL_GAP = 8;
 
 const formatStudyDuration = (minutes: number): string => {
   if (minutes >= 60) {
@@ -342,16 +345,25 @@ export default function ProfileScreen() {
 
   const radarMetaAnchors = useMemo(
     () => radarAxes.map((axis) => {
-      const iconOffset = RADAR_RADIUS + 58;
-      const labelOffset = RADAR_RADIUS + 102;
+      const iconOffset = RADAR_RADIUS + 28;
+      const iconX = RADAR_CENTER + Math.cos(axis.angle) * iconOffset;
+      const iconY = RADAR_CENTER + Math.sin(axis.angle) * iconOffset;
+      const labelLeft = Math.min(
+        Math.max(iconX - RADAR_LABEL_WIDTH / 2, 0),
+        RADAR_SIZE - RADAR_LABEL_WIDTH
+      );
+      const labelTop = Math.min(
+        iconY + RADAR_ICON_SIZE / 2 + RADAR_LABEL_GAP,
+        RADAR_SIZE - RADAR_LABEL_HEIGHT
+      );
 
       return {
         mood: axis.mood,
         value: axis.value,
-        iconX: RADAR_CENTER + Math.cos(axis.angle) * iconOffset,
-        iconY: RADAR_CENTER + Math.sin(axis.angle) * iconOffset,
-        labelX: RADAR_CENTER + Math.cos(axis.angle) * labelOffset,
-        labelY: RADAR_CENTER + Math.sin(axis.angle) * labelOffset,
+        iconX,
+        iconY,
+        labelLeft,
+        labelTop,
       };
     }),
     [radarAxes]
@@ -701,13 +713,13 @@ export default function ProfileScreen() {
                       pointerEvents="none"
                       style={{
                         position: 'absolute',
-                        left: anchor.labelX - 56,
-                        top: anchor.labelY - 7,
-                        width: 112,
+                        left: anchor.labelLeft,
+                        top: anchor.labelTop,
+                        width: RADAR_LABEL_WIDTH,
                         alignItems: 'center',
                       }}
                     >
-                      <Text className="text-[12px] leading-[16px] font-medium text-center" style={{ color: '#272b34' }}>
+                      <Text className="text-[11px] leading-[14px] font-medium text-center" style={{ color: '#272b34' }}>
                         {`${MOOD_CONFIG[anchor.mood].label} (${anchor.value})`}
                       </Text>
                     </View>
