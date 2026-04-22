@@ -422,19 +422,13 @@ export default function ProfileScreen() {
               backgroundColor: TOKENS.colors.surface,
             }}
           >
-            <View className="flex-row items-center justify-between">
-              <View className="w-9 h-9 rounded-xl items-center justify-center" style={{ backgroundColor: TOKENS.colors.surfaceSubtle }}>
-                <FontAwesome6 name="bars" size={15} color={TOKENS.colors.text} />
-              </View>
+            <View className="flex-row items-center justify-center">
               <Text
                 className="text-[28px] leading-[36px] font-bold tracking-[-0.56px]"
                 style={{ color: TOKENS.colors.primary }}
               >
                 Profile
               </Text>
-              <View className="w-9 h-9 rounded-xl items-center justify-center" style={{ backgroundColor: TOKENS.colors.surfaceSubtle }}>
-                <FontAwesome6 name="gear" size={16} color={TOKENS.colors.text} />
-              </View>
             </View>
 
             <View className="items-center mt-7">
@@ -448,16 +442,9 @@ export default function ProfileScreen() {
                 <FontAwesome6 name="user" size={35} color={TOKENS.colors.mutedText} />
               </View>
 
-              <Text className="text-[14px] leading-[20px] mt-5 text-center" style={{ color: TOKENS.colors.mutedText }}>
-                Track your learning journey
+              <Text className="text-[20px] leading-[28px] font-semibold mt-5 text-center" style={{ color: TOKENS.colors.text }}>
+                Alex W
               </Text>
-
-              <View className="mt-4 rounded-full px-4 py-2 flex-row items-center" style={{ backgroundColor: TOKENS.colors.surfaceSubtle }}>
-                <View className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: TOKENS.colors.primary }} />
-                <Text className="text-[14px] leading-[20px]" style={{ color: TOKENS.colors.mutedText }}>
-                  Today Drops {todayDrops}/{DAILY_DROP_LIMIT}
-                </Text>
-              </View>
             </View>
           </View>
 
