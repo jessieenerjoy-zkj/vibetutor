@@ -987,13 +987,12 @@ export default function TutorScreen() {
       <View className="flex-1 relative">
         <View className="absolute top-0 left-0 right-0 z-20">
           <View
-            className="px-5"
+            className="absolute right-5 flex-row items-center justify-end gap-3"
             style={{
-              paddingTop: insets.top + 10,
-              marginBottom: 8,
+              top: insets.top + 10,
+              zIndex: 30,
             }}
           >
-            <View className="flex-row items-center justify-end gap-3">
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => {
@@ -1013,7 +1012,6 @@ export default function TutorScreen() {
               >
                 <FontAwesome6 name="house" size={16} color="var(--color-muted)" />
               </TouchableOpacity>
-            </View>
           </View>
 
           <TouchableOpacity
@@ -1023,7 +1021,7 @@ export default function TutorScreen() {
             <View
               className="px-5 pb-5"
               style={{
-                paddingTop: insets.top + 16,
+                paddingTop: insets.top + 56,
                 backgroundColor: isProfileExpanded ? persona.color : 'var(--color-surface)',
                 borderBottomLeftRadius: 32,
                 borderBottomRightRadius: 32,
@@ -1157,11 +1155,10 @@ export default function TutorScreen() {
             end={{ x: 1, y: 0.9 }}
             style={{
               position: 'absolute',
-              left: 20,
-              right: 20,
+              left: 0,
+              right: 0,
               top: isProfileExpanded ? insets.top + 254 : insets.top + 146,
-              height: 300,
-              borderRadius: 30,
+              bottom: 0,
             }}
           />
         <ScrollView
