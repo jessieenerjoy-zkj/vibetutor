@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
+  Linking,
+  Modal,
   Platform,
   ScrollView,
   Share,
@@ -13,6 +15,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect } from 'expo-router';
 import { FontAwesome6 } from '@expo/vector-icons';
 import Reanimated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
+import { SvgXml } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen } from '@/components/Screen';
 import { useSafeRouter } from '@/hooks/useSafeRouter';
@@ -138,6 +141,196 @@ const withOpacity = (hex: string, opacity: number) => {
   return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
 };
 
+const POSTER_WIDTH = 1080;
+const POSTER_SIDE_PADDING = 72;
+const POSTER_TEXT_MAX_UNITS = 25;
+const POSTER_QR_GRID = 21;
+
+const escapeXml = (value: string) => {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+};
+
+const getPosterTextUnits = (value: string) => {
+  return Array.from(value).reduce((total, char) => {
+    return total + ((char.codePointAt(0) || 0) > 255 ? 2 : 1);
+  }, 0);
+};
+
+const splitByUnits = (value: string, maxUnits: number) => {
+  const chunks: string[] = [];
+  let current = '';
+
+  Array.from(value).forEach((char) => {
+    const candidate = `${current}${char}`;
+    if (getPosterTextUnits(candidate) <= maxUnits) {
+      current = candidate;
+      return;
+    }
+
+    if (current) {
+      chunks.push(current);
+    }
+    current = char;
+  });
+
+  if (current) {
+    chunks.push(current);
+  }
+
+  return chunks;
+};
+
+const splitPosterLines = (value: string, maxUnits: number) => {
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return [''];
+  }
+
+  const words = normalized.split(' ');
+  if (words.length === 1) {
+    return splitByUnits(normalized, maxUnits);
+  }
+
+  const lines: string[] = [];
+  let current = '';
+
+  words.forEach((word) => {
+    const candidate = current ? `${current} ${word}` : word;
+    if (getPosterTextUnits(candidate) <= maxUnits) {
+      current = candidate;
+      return;
+    }
+
+    if (current) {
+      lines.push(current);
+    }
+
+    if (getPosterTextUnits(word) <= maxUnits) {
+      current = word;
+      return;
+    }
+
+    const chunks = splitByUnits(word, maxUnits);
+    lines.push(...chunks.slice(0, -1));
+    current = chunks[chunks.length - 1] || '';
+  });
+
+  if (current) {
+    lines.push(current);
+  }
+
+  return lines;
+};
+
+const isFinderModule = (row: number, col: number, offsetRow: number, offsetCol: number) => {
+  const within =
+    row >= offsetRow && row < offsetRow + 7 && col >= offsetCol && col < offsetCol + 7;
+  if (!within) {
+    return false;
+  }
+
+  const relativeRow = row - offsetRow;
+  const relativeCol = col - offsetCol;
+  const isOuter = relativeRow === 0 || relativeRow === 6 || relativeCol === 0 || relativeCol === 6;
+  const isInner =
+    relativeRow >= 2 && relativeRow <= 4 && relativeCol >= 2 && relativeCol <= 4;
+
+  return isOuter || isInner;
+};
+
+const getPosterQrRects = (x: number, y: number, size: number) => {
+  const cell = size / POSTER_QR_GRID;
+  const rects: string[] = [];
+
+  for (let row = 0; row < POSTER_QR_GRID; row += 1) {
+    for (let col = 0; col < POSTER_QR_GRID; col += 1) {
+      const inFinder =
+        isFinderModule(row, col, 0, 0) ||
+        isFinderModule(row, col, 0, POSTER_QR_GRID - 7) ||
+        isFinderModule(row, col, POSTER_QR_GRID - 7, 0);
+
+      const isTiming = (row === 6 || col === 6) && !inFinder;
+      const isData = !inFinder && !isTiming && (row * 11 + col * 7 + row * col) % 5 <= 1;
+
+      if (!inFinder && !isTiming && !isData) {
+        continue;
+      }
+
+      const fill = inFinder || isTiming ? '#101014' : '#2d2d34';
+      rects.push(
+        `<rect x="${(x + col * cell).toFixed(2)}" y="${(y + row * cell).toFixed(2)}" width="${cell.toFixed(2)}" height="${cell.toFixed(2)}" fill="${fill}" />`
+      );
+    }
+  }
+
+  return rects.join('');
+};
+
+const buildSharePosterSvg = (quote: string, author: string, dateLabel: string) => {
+  const normalizedQuote = quote.replace(/^"+|"+$/g, '').trim();
+  const quoteLines = splitPosterLines(normalizedQuote, POSTER_TEXT_MAX_UNITS);
+  const quoteStartY = 180;
+  const quoteLineHeight = 108;
+  const quoteFontSize = 78;
+  const quoteBlockHeight = quoteLines.length * quoteLineHeight;
+  const authorY = quoteStartY + quoteBlockHeight + 72;
+  const footerY = authorY + 94;
+  const footerHeight = 236;
+  const posterHeight = footerY + footerHeight + 64;
+  const footerWidth = POSTER_WIDTH - POSTER_SIDE_PADDING * 2;
+  const qrSize = 140;
+  const qrWrapSize = 164;
+  const qrWrapX = POSTER_WIDTH - POSTER_SIDE_PADDING - 28 - qrWrapSize;
+  const qrWrapY = footerY + 36;
+  const qrX = qrWrapX + (qrWrapSize - qrSize) / 2;
+  const qrY = qrWrapY + (qrWrapSize - qrSize) / 2;
+
+  const quoteLinesSvg = quoteLines
+    .map((line, index) => {
+      const y = quoteStartY + index * quoteLineHeight;
+      return `<text x="${POSTER_SIDE_PADDING}" y="${y}" fill="#2b1f25" font-family="PlusJakartaSans, Arial, sans-serif" font-size="${quoteFontSize}" font-weight="700">${escapeXml(line)}</text>`;
+    })
+    .join('');
+
+  const qrRects = getPosterQrRects(qrX, qrY, qrSize);
+
+  const svg = `
+<svg xmlns="http://www.w3.org/2000/svg" width="${POSTER_WIDTH}" height="${posterHeight}" viewBox="0 0 ${POSTER_WIDTH} ${posterHeight}">
+  <defs>
+    <linearGradient id="posterBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f7f5f8" />
+      <stop offset="100%" stop-color="#f2eef3" />
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="${POSTER_WIDTH}" height="${posterHeight}" rx="56" fill="url(#posterBg)" />
+  ${quoteLinesSvg}
+  <text x="${POSTER_SIDE_PADDING}" y="${authorY}" fill="#7f615a" font-family="PlusJakartaSans, Arial, sans-serif" font-size="46" font-weight="600" letter-spacing="7">- ${escapeXml(author.toUpperCase())}</text>
+
+  <rect x="${POSTER_SIDE_PADDING}" y="${footerY}" width="${footerWidth}" height="${footerHeight}" rx="40" fill="#fff3f7" stroke="#ffd8e7" stroke-width="3" />
+  <circle cx="${POSTER_WIDTH - POSTER_SIDE_PADDING - 78}" cy="${footerY + 44}" r="58" fill="rgba(255, 10, 71, 0.12)" />
+
+  <text x="${POSTER_SIDE_PADDING + 34}" y="${footerY + 82}" fill="#ff0a47" font-family="PlusJakartaSans, Arial, sans-serif" font-size="34" font-weight="700">VibeTutor Daily Spark</text>
+  <text x="${POSTER_SIDE_PADDING + 34}" y="${footerY + 130}" fill="#6f6167" font-family="PlusJakartaSans, Arial, sans-serif" font-size="31" font-weight="500">Keep your momentum one drop at a time.</text>
+
+  <rect x="${POSTER_SIDE_PADDING + 34}" y="${footerY + 154}" width="230" height="56" rx="28" fill="#ffe3ec" />
+  <text x="${POSTER_SIDE_PADDING + 58}" y="${footerY + 191}" fill="#be1d4f" font-family="PlusJakartaSans, Arial, sans-serif" font-size="28" font-weight="700">${escapeXml(dateLabel)}</text>
+
+  <rect x="${qrWrapX}" y="${qrWrapY}" width="${qrWrapSize}" height="${qrWrapSize}" rx="24" fill="#ffffff" stroke="#f6d3df" stroke-width="2" />
+  ${qrRects}
+</svg>
+`.trim();
+
+  return {
+    svg,
+    height: posterHeight,
+  };
+};
+
 export default function HomeScreen() {
   const router = useSafeRouter();
   const insets = useSafeAreaInsets();
@@ -147,6 +340,7 @@ export default function HomeScreen() {
   const [isLiked, setIsLiked] = useState(false);
   const [aiInsight, setAiInsight] = useState('');
   const [isLoadingInsight, setIsLoadingInsight] = useState(false);
+  const [showSharePoster, setShowSharePoster] = useState(false);
 
   useEffect(() => {
     const today = new Date();
@@ -272,23 +466,76 @@ export default function HomeScreen() {
     setIsLiked(nextState);
   };
 
+  const quoteMessage = MOTD_MESSAGES[motdIndex] || MOTD_MESSAGES[0] || '';
+  const { quote, author } = useMemo(() => splitQuoteAndAuthor(quoteMessage), [quoteMessage]);
+
   const handleShareMOTD = async () => {
     const message = MOTD_MESSAGES[motdIndex];
     try {
-      if (Platform.OS === 'web') {
-        await Clipboard.setStringAsync(message);
-        Alert.alert('Copied', 'Quote copied to clipboard.');
-      } else {
-        await Share.share({ message });
-      }
-    } catch {
       await Clipboard.setStringAsync(message);
-      Alert.alert('Copied', 'Quote copied to clipboard.');
+      setShowSharePoster(true);
+    } catch {
+      setShowSharePoster(true);
     }
   };
 
-  const quoteMessage = MOTD_MESSAGES[motdIndex] || MOTD_MESSAGES[0] || '';
-  const { quote, author } = useMemo(() => splitQuoteAndAuthor(quoteMessage), [quoteMessage]);
+  const sharePosterText = useMemo(
+    () => `"${quote}"\n\n- ${author.toUpperCase()}\n\n#VibeTutor #DailyMotivation`,
+    [author, quote]
+  );
+
+  const todayLabel = useMemo(() => {
+    const today = new Date();
+    return `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, '0')}.${String(today.getDate()).padStart(2, '0')}`;
+  }, []);
+
+  const posterPayload = useMemo(
+    () => buildSharePosterSvg(quote, author, todayLabel),
+    [author, quote, todayLabel]
+  );
+
+  const handleDownloadPoster = useCallback(async () => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const blob = new Blob([posterPayload.svg], { type: 'image/svg+xml;charset=utf-8' });
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = `vibetutor-daily-quote-${todayLabel}.svg`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+      Alert.alert('Downloaded', 'Poster image downloaded.');
+      return;
+    }
+
+    await Clipboard.setStringAsync(sharePosterText);
+    Alert.alert('Poster Ready', 'Use screenshot to save this poster, then post it.');
+  }, [posterPayload.svg, sharePosterText, todayLabel]);
+
+  const handleShareToChannel = useCallback(
+    async (channel: 'tiktok' | 'instagram') => {
+      try {
+        if (Platform.OS === 'web') {
+          const targetUrl = channel === 'tiktok'
+            ? 'https://www.tiktok.com/upload'
+            : 'https://www.instagram.com';
+          await Linking.openURL(targetUrl);
+          return;
+        }
+
+        await Share.share({
+          message: sharePosterText,
+          title: `Share to ${channel === 'tiktok' ? 'TikTok' : 'Instagram'}`,
+        });
+      } catch {
+        await Clipboard.setStringAsync(sharePosterText);
+        Alert.alert('Copied', 'Poster text copied. You can paste it into your post.');
+      }
+    },
+    [sharePosterText]
+  );
+
   const learningDropCount = Math.max(0, Math.min(DAILY_DROP_LIMIT, todayDrops));
   const isDailyDropGoalMet = learningDropCount >= DAILY_DROP_LIMIT;
   const insightBody = isLoadingInsight
@@ -514,6 +761,66 @@ export default function HomeScreen() {
             </Reanimated.View>
           </View>
         </ScrollView>
+
+        <Modal
+          visible={showSharePoster}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowSharePoster(false)}
+        >
+          <View style={styles.posterModalWrap}>
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={() => setShowSharePoster(false)}
+              style={styles.posterMask}
+            />
+
+            <View style={styles.posterSheet}>
+              <ScrollView
+                style={styles.posterViewport}
+                contentContainerStyle={styles.posterViewportContent}
+                showsVerticalScrollIndicator={false}
+              >
+                <View style={styles.posterCanvasWrap}>
+                  <SvgXml
+                    xml={posterPayload.svg}
+                    width="100%"
+                    height={(posterPayload.height * 320) / POSTER_WIDTH}
+                  />
+                </View>
+              </ScrollView>
+
+              <View style={styles.posterActions}>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => void handleDownloadPoster()}
+                  style={styles.posterActionButton}
+                >
+                  <FontAwesome6 name="download" size={18} color={UI.text} />
+                  <Text style={styles.posterActionText}>下载图片</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => void handleShareToChannel('tiktok')}
+                  style={styles.posterActionButton}
+                >
+                  <FontAwesome6 name="tiktok" size={18} color={UI.text} />
+                  <Text style={styles.posterActionText}>TikTok</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => void handleShareToChannel('instagram')}
+                  style={styles.posterActionButton}
+                >
+                  <FontAwesome6 name="instagram" size={18} color={UI.text} />
+                  <Text style={styles.posterActionText}>INS</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </View>
     </Screen>
   );
@@ -866,5 +1173,63 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontFamily: FONT.bold,
     fontSize: 16,
+  },
+  posterModalWrap: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  posterMask: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 10, 18, 0.58)',
+  },
+  posterSheet: {
+    backgroundColor: '#fff6fa',
+    borderColor: '#f4dce7',
+    borderRadius: 28,
+    borderWidth: 1,
+    maxHeight: '90%',
+    overflow: 'hidden',
+    width: '100%',
+  },
+  posterViewport: {
+    maxHeight: 520,
+  },
+  posterViewportContent: {
+    paddingHorizontal: 14,
+    paddingTop: 14,
+    paddingBottom: 8,
+  },
+  posterCanvasWrap: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  posterActions: {
+    borderTopColor: '#f2d7e3',
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+  posterActionButton: {
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderColor: '#efd6e1',
+    borderRadius: 16,
+    borderWidth: 1,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+    marginHorizontal: 4,
+    minHeight: 46,
+  },
+  posterActionText: {
+    color: UI.text,
+    fontFamily: FONT.semibold,
+    fontSize: 13,
   },
 });
