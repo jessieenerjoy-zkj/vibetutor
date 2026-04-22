@@ -289,10 +289,8 @@ export default function HomeScreen() {
 
   const quoteMessage = MOTD_MESSAGES[motdIndex] || MOTD_MESSAGES[0] || '';
   const { quote, author } = useMemo(() => splitQuoteAndAuthor(quoteMessage), [quoteMessage]);
-  const reservoirPoints = Math.max(
-    0,
-    Math.min(10, Math.round((todayDrops / DAILY_DROP_LIMIT) * 10))
-  );
+  const learningDropCount = Math.max(0, Math.min(DAILY_DROP_LIMIT, todayDrops));
+  const isDailyDropGoalMet = learningDropCount >= DAILY_DROP_LIMIT;
   const insightBody = isLoadingInsight
     ? 'Preparing a personalized next step for your current study vibe...'
     : aiInsight;
@@ -453,35 +451,43 @@ export default function HomeScreen() {
             <Reanimated.View entering={FadeInDown.duration(280).delay(120)} style={[styles.card, styles.section]}>
               <View style={styles.reservoirHeader}>
                 <View style={styles.reservoirTitleBlock}>
-                  <Text style={styles.cardTitle}>Mastery Reservoir</Text>
-                  <Text style={styles.cardSubtitle}>Consistency builds depth.</Text>
+                  <Text style={styles.cardTitle}>Learning Drop</Text>
+                  <Text style={styles.cardSubtitle}>
+                    {isDailyDropGoalMet
+                      ? 'Daily goal met. Nice work today.'
+                      : 'Each successful tutor reply adds one drop.'}
+                  </Text>
                 </View>
 
                 <Text style={styles.reservoirCount}>
-                  <Text style={styles.reservoirCountAccent}>{reservoirPoints}</Text>
-                  <Text style={styles.reservoirCountBase}>/10</Text>
+                  <Text style={styles.reservoirCountAccent}>{learningDropCount}</Text>
+                  <Text style={styles.reservoirCountBase}>/{DAILY_DROP_LIMIT}</Text>
                 </Text>
               </View>
 
               <View style={styles.reservoirGrid}>
-                {[0, 1].map((rowIndex) => (
-                  <View key={`reservoir-row-${rowIndex}`} style={styles.dropRow}>
-                    {Array.from({ length: 5 }).map((_, columnIndex) => {
-                      const dropIndex = rowIndex * 5 + columnIndex;
-                      const filled = dropIndex < reservoirPoints;
+                <View style={styles.dropRow}>
+                  {Array.from({ length: DAILY_DROP_LIMIT }).map((_, dropIndex) => {
+                    const filled = dropIndex < learningDropCount;
 
-                      return (
-                        <View key={`drop-${dropIndex}`} style={styles.dropCell}>
-                          <FontAwesome6
-                            name="droplet"
-                            size={30}
-                            color={filled ? UI.filledDrop : UI.emptyDrop}
-                          />
-                        </View>
-                      );
-                    })}
+                    return (
+                      <View key={`drop-${dropIndex}`} style={styles.dropCell}>
+                        <FontAwesome6
+                          name="droplet"
+                          size={34}
+                          color={filled ? UI.filledDrop : UI.emptyDrop}
+                        />
+                      </View>
+                    );
+                  })}
+                </View>
+
+                {isDailyDropGoalMet ? (
+                  <View style={styles.goalPill}>
+                    <FontAwesome6 name="circle-check" size={14} color={UI.primary} />
+                    <Text style={styles.goalPillText}>Daily goal met</Text>
                   </View>
-                ))}
+                ) : null}
               </View>
             </Reanimated.View>
 
@@ -773,16 +779,33 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
   reservoirGrid: {
-    gap: 22,
+    alignItems: 'flex-start',
+    gap: 20,
     marginTop: 28,
   },
   dropRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    width: '100%',
   },
   dropCell: {
     alignItems: 'center',
-    width: 44,
+    width: 48,
+  },
+  goalPill: {
+    alignItems: 'center',
+    backgroundColor: UI.primarySoft,
+    borderRadius: 999,
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  goalPillText: {
+    color: '#b8133c',
+    fontFamily: FONT.bold,
+    fontSize: 12,
+    letterSpacing: 0.4,
   },
   insightCard: {
     backgroundColor: UI.insight,
