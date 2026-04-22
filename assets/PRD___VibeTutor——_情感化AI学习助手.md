@@ -248,6 +248,26 @@ stateDiagram-v2
         <td>1. 首次进入AI Tutor页面：根据当前心情+当前默认人格，发送一条预定义打招呼消息（不调用API，前端硬编码）。<br>2. 手动切换人格时：立即发送新人格的打招呼消息（同样硬编码）。<br>3. 打招呼消息不计入水滴，不占用对话历史存储（可作为第一条消息存储）。</td>
         <td>消息模板见附录。</td>
     </tr>
+    <tr>
+        <td>**Finish Learning入口（结束学习）**</td>
+        <td>1. 在 AI Tutor 页面右上角新增文字按钮 `Finish Learning`，位置在 Home 图标左侧，配旗帜或打卡图标。<br>2. 点击后先执行前置判断：若今日已解答题数（即今日水滴增加数）= 0，则不弹窗，直接 Toast：`You haven't solved any problems yet today. Let's get started!`。<br>3. 仅当今日已解答题数 > 0 时，进入二次确认弹窗流程。</td>
+        <td>该入口属于“结束当日学习会话”的显性动作入口，与返回首页/切换Tab区分。</td>
+    </tr>
+    <tr>
+        <td>**结束学习二次确认弹窗**</td>
+        <td>1. 触发：点击 `Finish Learning` 且通过前置判断。<br>2. 标题：`Wrap up for today?`。<br>3. 次按钮：`Keep Learning`，点击后关闭弹窗并留在当前 Tutor 页面。<br>4. 主按钮：`Yes, generate my report`，点击后生成并进入学习报告卡。<br>5. 弹窗支持点击遮罩关闭，关闭行为等同 `Keep Learning`。</td>
+        <td>主次按钮层级需明显区分，避免误触导致提前结束。</td>
+    </tr>
+    <tr>
+        <td>**学习报告卡（Study Report Card）**</td>
+        <td>1. 展示形式：全屏卡片或全屏弹层，视觉需适配长图截屏与社交分享（IG Story / TikTok）。<br>2. 核心指标：<br>   - `Today's Focus Time`：今日在 Tutor 页面前台活跃总时长（分钟）。<br>   - `Problems Solved`：今日在 Tutor 中成功解答题目总数。<br>   - `Subject Breakdown`：今日学科分布，按列表或微型饼图展示（例：Math: 3, Physics: 2, History: 1）。<br>3. 底部 CTA：主按钮 `Share to IG/TikTok`（调用 Web Share API，分享图需包含 Gauth 标识）；次按钮 `Back to Home`（返回首页）。</td>
+        <td>报告卡以“当日复盘 + 可分享”作为目标，不替代 Profile 中长期数据模块。</td>
+    </tr>
+    <tr>
+        <td>**计时与学科统计逻辑**</td>
+        <td>1. 今日专注时长统计：通过 `document.visibilityState` 监听页面可见性，仅在 `visible` 时累加时长；切后台、锁屏或页面不可见时暂停。<br>2. 每日重置：本地数据按自然日（00:00）清零并创建新日期桶。<br>3. 学科自动识别：在发送给 OpenAI 的 System Prompt 中增加约束，要求模型在回复末尾附加结构化标签（如 `[Subject: Math/Physics/Chemistry/History/Other]`）。<br>4. 前端解析：收到回复后提取并剔除末尾 Subject 标签，用户可见消息中不展示标签文本；解析结果写入 localStorage 的当日学科统计对象。<br>5. 若标签缺失或解析失败，回退为 `Other` 并记录一次解析异常日志。</td>
+        <td>保持“零额外用户输入”原则，学科标签完全由 AI 自动补全，前端做容错解析。</td>
+    </tr>
 </table>
 
 ### 5.3 Profile Tab
@@ -415,6 +435,31 @@ stateDiagram-v2
         <td>`stamp_name`</td>
         <td>`小幼苗 / 仙人掌 / 向日葵 / 菩提`</td>
         <td>用于追踪各图章的解锁漏斗，评估长期留存健康度</td>
+    </tr>
+
+    <tr>
+        <td>点击结束学习</td>
+        <td>`click_finish_learning`</td>
+        <td>用户点击 Tutor 页右上角 Finish Learning 按钮</td>
+        <td>`today_solved`</td>
+        <td>今日解题数（整数）</td>
+        <td>若 `today_solved=0`，应与 Toast 分支联动记录</td>
+    </tr>
+    <tr>
+        <td>生成学习报告卡</td>
+        <td>`generate_report_card`</td>
+        <td>用户成功生成 Study Report Card</td>
+        <td>`total_mins` / `total_solved`</td>
+        <td>当日专注分钟数 / 当日解题数</td>
+        <td>仅在报告卡生成成功后上报</td>
+    </tr>
+    <tr>
+        <td>分享学习报告卡</td>
+        <td>`share_report_card`</td>
+        <td>用户点击报告卡分享按钮</td>
+        <td>`share_target`</td>
+        <td>`ig / tiktok / copy`</td>
+        <td>用于评估分享渠道偏好与转化效果</td>
     </tr>
     <tr>
         <td>AI回复失败</td>
