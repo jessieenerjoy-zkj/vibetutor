@@ -279,6 +279,14 @@ export default function ProfileScreen() {
     return distribution;
   };
 
+  const handleOpenDailyReport = useCallback(() => {
+    router.push('/tutor', {
+      openReport: true,
+      reportLaunchToken: Date.now(),
+      entrySource: 'profile_stats',
+    });
+  }, [router]);
+
   const handleClearData = () => {
     Alert.alert('Clear Data', 'Are you sure you want to clear all data? This action cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
@@ -483,6 +491,29 @@ export default function ProfileScreen() {
                   iconColor={TOKENS.colors.tertiary}
                 />
               </View>
+
+              <TouchableOpacity
+                activeOpacity={0.75}
+                onPress={handleOpenDailyReport}
+                className="mt-4 rounded-[16px] border px-4 py-3 flex-row items-center justify-between"
+                style={{
+                  borderColor: TOKENS.colors.border,
+                  backgroundColor: '#fff5f8',
+                }}
+              >
+                <View className="flex-row items-center flex-1">
+                  <View
+                    className="w-8 h-8 rounded-full items-center justify-center mr-3"
+                    style={{ backgroundColor: '#ffd9e4' }}
+                  >
+                    <FontAwesome6 name="chart-line" size={14} color={TOKENS.colors.primaryMuted} />
+                  </View>
+                  <Text className="text-[14px] leading-[20px] font-semibold" style={{ color: TOKENS.colors.primaryMuted }}>
+                    Tap to view my daily learning report
+                  </Text>
+                </View>
+                <FontAwesome6 name="arrow-up-right-from-square" size={14} color={TOKENS.colors.primaryMuted} />
+              </TouchableOpacity>
             </View>
           </View>
 

@@ -189,12 +189,15 @@ export default function TutorScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
   const personaScrollRef = useRef<ScrollView>(null);
   const launchHandledRef = useRef<string | null>(null);
+  const reportLaunchHandledRef = useRef<string | null>(null);
   const params = useSafeSearchParams<{
     entrySource?: string;
     persona?: TutorPersona;
     mood?: MoodType;
     autoGreeting?: boolean;
     launchToken?: number;
+    openReport?: boolean;
+    reportLaunchToken?: number;
   }>();
   const [currentPersona, setCurrentPersona] = useState<TutorPersona>('Neutral');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -672,6 +675,24 @@ export default function TutorScreen() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!params.openReport) {
+      return;
+    }
+
+    const reportLaunchKey = String(params.reportLaunchToken || 'default');
+    if (reportLaunchHandledRef.current === reportLaunchKey) {
+      return;
+    }
+
+    if (showReportCard || isGeneratingReport) {
+      return;
+    }
+
+    reportLaunchHandledRef.current = reportLaunchKey;
+    void handleGenerateReport();
+  }, [handleGenerateReport, isGeneratingReport, params.openReport, params.reportLaunchToken, showReportCard]);
+
   const handleShareReport = useCallback(async () => {
     if (!reportData) {
       return;
@@ -1096,10 +1117,10 @@ export default function TutorScreen() {
               elevation: 8,
             }}
           >
-            <Text allowFontScaling={false} className="text-center text-[48px] font-black tracking-[-0.8px] text-[#140B16]">
+            <Text allowFontScaling={false} className="text-center text-[40px] font-black tracking-[-0.8px] text-[#140B16]">
               Wrap up for today?
             </Text>
-            <Text allowFontScaling={false} className="mt-4 text-center text-[20px] leading-[30px] text-[#5A667A]">
+            <Text allowFontScaling={false} className="mt-4 text-center text-[18px] leading-[27px] text-[#5A667A]">
               You can keep going or generate your study report card now.
             </Text>
             <View className="mt-8 flex-row gap-4">
