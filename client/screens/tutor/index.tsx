@@ -22,6 +22,7 @@ import Animated, {
   withDelay,
   withTiming,
 } from 'react-native-reanimated';
+import Svg, { Circle } from 'react-native-svg';
 import Toast from 'react-native-toast-message';
 import { Screen } from '@/components/Screen';
 import { useSafeRouter, useSafeSearchParams } from '@/hooks/useSafeRouter';
@@ -87,6 +88,19 @@ const REPORT_SUBJECT_LABELS: Array<{ key: keyof SubjectBreakdown; label: string 
   { key: 'History', label: 'History' },
   { key: 'Other', label: 'Other' },
 ];
+
+const REPORT_SUBJECT_COLORS: Record<keyof SubjectBreakdown, string> = {
+  Math: '#FF0040',
+  Physics: '#7C3AED',
+  Chemistry: '#F59E0B',
+  History: '#16A4E0',
+  Other: '#94A3B8',
+};
+
+const REPORT_DONUT_SIZE = 184;
+const REPORT_DONUT_STROKE_WIDTH = 24;
+const REPORT_DONUT_RADIUS = (REPORT_DONUT_SIZE - REPORT_DONUT_STROKE_WIDTH) / 2;
+const REPORT_DONUT_CIRCUMFERENCE = 2 * Math.PI * REPORT_DONUT_RADIUS;
 
 const PERSONA_MOOD_GREETINGS: Record<MoodType, Record<TutorPersona, string>> = {
   Crushed: {
@@ -707,26 +721,55 @@ export default function TutorScreen() {
 
   const reportBreakdownRows = useMemo(() => {
     const breakdown = reportData?.subjectBreakdown;
-    if (!breakdown) {
-      return [];
-    }
+    const total = breakdown ? Object.values(breakdown).reduce((sum, count) => sum + count, 0) : 0;
 
-    return REPORT_SUBJECT_LABELS
-      .map(({ key, label }) => ({
+    return REPORT_SUBJECT_LABELS.map(({ key, label }) => {
+      const value = breakdown?.[key] ?? 0;
+
+      return {
         key,
         label,
-        value: breakdown[key],
-      }))
-      .filter((item) => item.value > 0);
+        value,
+        color: REPORT_SUBJECT_COLORS[key],
+        percent: total > 0 ? Math.round((value / total) * 100) : 0,
+      };
+    });
   }, [reportData]);
 
   const totalSubjectsSolved = useMemo(() => {
-    if (!reportData) {
-      return 0;
-    }
+    return reportBreakdownRows.reduce((sum, item) => sum + item.value, 0);
+  }, [reportBreakdownRows]);
 
-    return Object.values(reportData.subjectBreakdown).reduce((sum, count) => sum + count, 0);
-  }, [reportData]);
+  const reportDisplayRows = useMemo(() => {
+    return reportBreakdownRows.filter((item) => item.key !== 'Other' || item.value > 0);
+  }, [reportBreakdownRows]);
+
+  const reportDonutSegments = useMemo(() => {
+    const chartRows = reportDisplayRows.length > 0 ? reportDisplayRows : reportBreakdownRows;
+    const rowsWithValue = chartRows.some((item) => item.value > 0)
+      ? chartRows
+      : chartRows.map((item) => ({
+          ...item,
+          value: 1,
+        }));
+    const total = rowsWithValue.reduce((sum, item) => sum + item.value, 0);
+
+    let accumulatedRatio = 0;
+
+    return rowsWithValue.map((item) => {
+      const ratio = total > 0 ? item.value / total : 0;
+      const dashLength = ratio * REPORT_DONUT_CIRCUMFERENCE;
+      const segment = {
+        key: item.key,
+        color: item.color,
+        strokeDasharray: `${dashLength} ${REPORT_DONUT_CIRCUMFERENCE}`,
+        strokeDashoffset: -accumulatedRatio * REPORT_DONUT_CIRCUMFERENCE,
+      };
+
+      accumulatedRatio += ratio;
+      return segment;
+    });
+  }, [reportBreakdownRows, reportDisplayRows]);
 
   const handleSend = useCallback(async () => {
     const imageToSend = selectedImage;
@@ -1101,8 +1144,7 @@ export default function TutorScreen() {
                   elevation: 2,
                 }}
               >
-                <Text className="text-[14px] leading-[19px] text-[#4D3843]">Questions</Text>
-                <Text className="text-[14px] leading-[19px] text-[#4D3843]">Photographed</Text>
+                <Text className="text-[14px] leading-[19px] text-[#4D3843]">Problem Solved</Text>
                 <Text className="mt-3 text-[22px] font-bold text-[#FF184F]">
                   {reportData?.totalSolved ?? 0} Questions
                 </Text>
@@ -1130,22 +1172,73 @@ export default function TutorScreen() {
               </View>
             </View>
 
-            <View className="mt-5 rounded-[20px] border border-[#E8E0E5] bg-white px-4 py-4">
-              <View className="flex-row items-center justify-between">
-                <Text className="text-xs font-semibold uppercase tracking-[1.5px] text-[#8D6A79]">Subject Breakdown</Text>
-                <Text className="text-xs text-[#9C7B88]">{totalSubjectsSolved} solved</Text>
+            <View className="mt-5 rounded-[24px] border border-[#E5E6EA] bg-[#F8F8FA] px-4 py-5">
+              <Text className="text-[15px] font-semibold text-[#151318]">Subject Distribution</Text>
+
+              <View className="mt-4 items-center justify-center">
+                <View className="h-[184px] w-[184px] items-center justify-center">
+                  <Svg
+                    width={REPORT_DONUT_SIZE}
+                    height={REPORT_DONUT_SIZE}
+                    style={{ transform: [{ rotate: '-90deg' }] }}
+                  >
+                    <Circle
+                      cx={REPORT_DONUT_SIZE / 2}
+                      cy={REPORT_DONUT_SIZE / 2}
+                      r={REPORT_DONUT_RADIUS}
+                      fill="none"
+                      stroke="#E3E5E8"
+                      strokeWidth={REPORT_DONUT_STROKE_WIDTH}
+                    />
+                    {reportDonutSegments.map((segment) => (
+                      <Circle
+                        key={segment.key}
+                        cx={REPORT_DONUT_SIZE / 2}
+                        cy={REPORT_DONUT_SIZE / 2}
+                        r={REPORT_DONUT_RADIUS}
+                        fill="none"
+                        stroke={segment.color}
+                        strokeWidth={REPORT_DONUT_STROKE_WIDTH}
+                        strokeLinecap="round"
+                        strokeDasharray={segment.strokeDasharray}
+                        strokeDashoffset={segment.strokeDashoffset}
+                      />
+                    ))}
+                  </Svg>
+                  <View className="absolute items-center justify-center">
+                    <Text className="text-[16px] font-medium text-[#201B21]">Total</Text>
+                    <Text className="text-[40px] leading-[44px] font-semibold text-[#201B21]">{totalSubjectsSolved}</Text>
+                  </View>
+                </View>
               </View>
-              <View className="mt-3 gap-2">
-                {reportBreakdownRows.length > 0 ? (
-                  reportBreakdownRows.map((item) => (
-                    <View key={item.key} className="flex-row items-center justify-between rounded-xl bg-[#FFF3F7] px-3 py-2">
-                      <Text className="text-sm font-medium text-[#4A3440]">{item.label}</Text>
-                      <Text className="text-sm font-semibold text-[#B84370]">{item.value}</Text>
+
+              <View className="mt-4 gap-4">
+                {reportDisplayRows.map((item) => (
+                  <View key={item.key}>
+                    <View className="flex-row items-center justify-between">
+                      <View className="flex-row items-center">
+                        <View
+                          className="mr-2 h-[12px] w-[12px] rounded-full"
+                          style={{ backgroundColor: item.color }}
+                        />
+                        <Text className="text-[14px] text-[#1F1A20]">{item.label}</Text>
+                      </View>
+                      <View className="flex-row items-center gap-3">
+                        <Text className="text-[14px] font-medium text-[#1F1A20]">{item.value} Questions</Text>
+                        <Text className="w-8 text-right text-[14px] text-[#3F2F37]">{item.percent}%</Text>
+                      </View>
                     </View>
-                  ))
-                ) : (
-                  <Text className="text-sm text-[#8D7280]">No solved problems recorded today.</Text>
-                )}
+                    <View className="mt-3 h-[6px] rounded-full bg-[#E0E2E6]">
+                      <View
+                        className="h-[6px] rounded-full"
+                        style={{
+                          width: `${item.percent}%`,
+                          backgroundColor: item.color,
+                        }}
+                      />
+                    </View>
+                  </View>
+                ))}
               </View>
             </View>
 
@@ -1155,7 +1248,7 @@ export default function TutorScreen() {
                 onPress={() => {
                   void handleShareReport();
                 }}
-                className="items-center justify-center rounded-2xl bg-[#D93A6A] px-4 py-4"
+                className="items-center justify-center rounded-2xl bg-[#FF0040] px-4 py-4"
               >
                 <Text className="text-base font-semibold text-white">Share to IG/TikTok</Text>
               </TouchableOpacity>
