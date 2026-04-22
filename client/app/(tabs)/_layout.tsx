@@ -70,7 +70,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="tutor"
         options={{
-          title: 'AITutor',
+          title: 'AI Tutor',
           tabBarIcon: ({ color }) => (
             <FontAwesome6 name="graduation-cap" size={22} color={color} />
           ),

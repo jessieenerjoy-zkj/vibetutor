@@ -508,13 +508,8 @@ export default function TutorScreen() {
       return newMessages;
     });
 
-    if (isVoiceEnabled) {
-      latestAssistantMessageIdRef.current = nextWelcome.id;
-      await handlePlayMessage(nextWelcome, { isAuto: true, persona: nextPersona });
-    }
-
     scrollToBottom();
-  }, [handlePlayMessage, isVoiceEnabled, selectedStylePersona]);
+  }, [selectedStylePersona]);
 
   // OCR识别图片文字
   const recognizeImageText = async (imageUri: string): Promise<string | null> => {
