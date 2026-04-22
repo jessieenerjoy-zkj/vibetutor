@@ -1080,33 +1080,42 @@ export default function TutorScreen() {
         transparent
         onRequestClose={() => setShowFinishModal(false)}
       >
-        <View className="flex-1 items-center justify-center px-6">
+        <View className="flex-1 items-center justify-center px-5">
           <TouchableOpacity
             activeOpacity={1}
             onPress={() => setShowFinishModal(false)}
-            className="absolute inset-0 bg-black/35"
+            className="absolute inset-0 bg-black/45"
           />
-          <View className="w-full max-w-[360px] rounded-3xl bg-white px-6 py-6">
-            <Text className="text-center text-xl font-bold text-[#22171D]">Wrap up for today?</Text>
-            <Text className="mt-3 text-center text-sm leading-5 text-[#6B5A61]">
+          <View
+            className="w-full max-w-[760px] rounded-[40px] bg-white px-6 py-7"
+            style={{
+              shadowColor: '#120811',
+              shadowOffset: { width: 0, height: 12 },
+              shadowOpacity: 0.16,
+              shadowRadius: 24,
+              elevation: 8,
+            }}
+          >
+            <Text className="text-center text-[48px] font-black tracking-[-0.8px] text-[#140B16]">Wrap up for today?</Text>
+            <Text className="mt-4 text-center text-[20px] leading-[30px] text-[#5A667A]">
               You can keep going or generate your study report card now.
             </Text>
-            <View className="mt-6 flex-row gap-3">
+            <View className="mt-8 flex-row gap-4">
               <TouchableOpacity
-                className="flex-1 items-center justify-center rounded-2xl border border-[#E9DCE1] bg-[#FFF8FA] py-3"
+                className="h-[72px] flex-1 items-center justify-center rounded-[24px] border-[2px] border-[#FF0B4F] bg-white"
                 activeOpacity={0.85}
                 onPress={() => setShowFinishModal(false)}
               >
-                <Text className="text-sm font-semibold text-[#8B6A76]">Keep Learning</Text>
+                <Text className="text-[16px] font-bold text-[#09070D]">Keep Learning</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                className="flex-1 items-center justify-center rounded-2xl bg-[#D93A6A] py-3"
+                className="h-[72px] flex-1 items-center justify-center rounded-[24px] bg-[#FF0040] px-3"
                 activeOpacity={0.85}
                 onPress={() => {
                   void handleGenerateReport();
                 }}
               >
-                <Text className="text-sm font-semibold text-white">Yes, generate my report</Text>
+                <Text className="text-center text-[16px] font-bold leading-[22px] text-white">Yes, generate my report</Text>
               </TouchableOpacity>
             </View>
           </View>
