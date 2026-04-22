@@ -5,6 +5,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Platform,
 } from 'react-native';
 import Svg, { Circle, Line, Path, Polygon } from 'react-native-svg';
 import { Screen } from '@/components/Screen';
@@ -27,7 +28,7 @@ import {
   getMoodHistory,
   getChatHistory,
   getTodayDrops,
-  clearAllData,
+  clearChatHistory,
   getDailyDrops,
 } from '@/utils/storage';
 
@@ -287,20 +288,41 @@ export default function ProfileScreen() {
     });
   }, [router]);
 
-  const handleClearData = () => {
-    Alert.alert('Clear Data', 'Are you sure you want to clear all data? This action cannot be undone.', [
+  const performClearHistory = useCallback(async () => {
+    await clearChatHistory();
+    setSelectedStamp(null);
+    await loadData();
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.alert('History has been removed.');
+      return;
+    }
+
+    Alert.alert('Cleared', 'History has been removed.');
+  }, [loadData]);
+
+  const handleClearData = useCallback(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const confirmed = window.confirm('Clear AI Tutor history? This action cannot be undone.');
+      if (!confirmed) {
+        return;
+      }
+
+      void performClearHistory();
+      return;
+    }
+
+    Alert.alert('Clear History', 'Clear AI Tutor history? This action cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Confirm',
-        onPress: async () => {
-          await clearAllData();
-          setSelectedStamp(null);
-          await loadData();
-          Alert.alert('Cleared', 'All data has been removed.');
+        style: 'destructive',
+        onPress: () => {
+          void performClearHistory();
         },
       },
     ]);
-  };
+  }, [performClearHistory]);
 
   const moodTrend = getMoodTrend();
   const moodDistribution = getMoodDistribution();
@@ -772,7 +794,7 @@ export default function ProfileScreen() {
                 style={{ borderColor: TOKENS.colors.border, backgroundColor: TOKENS.colors.surface }}
               >
                 <Text className="text-[16px] leading-[24px] font-semibold" style={{ color: TOKENS.colors.primaryMuted }}>
-                  Clear Data
+                  Clear History
                 </Text>
               </TouchableOpacity>
             </View>
