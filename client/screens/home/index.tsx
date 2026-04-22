@@ -17,6 +17,7 @@ import { FontAwesome6 } from '@expo/vector-icons';
 import Reanimated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 import { SvgXml } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AppProfileIcon } from '@/components/AppProfileIcon';
 import { Screen } from '@/components/Screen';
 import { useSafeRouter } from '@/hooks/useSafeRouter';
 import { DAILY_DROP_LIMIT } from '@/utils/learning';
@@ -582,7 +583,7 @@ export default function HomeScreen() {
               onPress={() => router.push('/profile')}
               style={styles.headerButton}
             >
-              <FontAwesome6 name="user" size={18} color={UI.primary} />
+              <AppProfileIcon size={18} color={UI.primary} />
             </TouchableOpacity>
           </View>
         </View>

@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FontAwesome6 } from '@expo/vector-icons';
+import { AppProfileIcon } from '@/components/AppProfileIcon';
 
 const TAB_UI = {
   activeBackground: '#fff0f4',
@@ -81,7 +82,7 @@ export default function TabLayout() {
         options={{
           title: 'Profile',
           tabBarIcon: ({ color }) => (
-            <FontAwesome6 name="user" size={22} color={color} />
+            <AppProfileIcon size={22} color={color} />
           ),
         }}
       />
