@@ -101,10 +101,17 @@ interface MoodTrendItem {
   date: string;
 }
 
-const MOOD_ORDER: MoodType[] = ['Crushed', 'Stuck', 'Calm', 'Engaged', 'Hyper'];
-const RADAR_SIZE = 240;
+const MOOD_ORDER: MoodType[] = ['Hyper', 'Engaged', 'Calm', 'Stuck', 'Crushed'];
+const MOOD_ICON_MAP: Record<MoodType, string> = {
+  Hyper: 'face-grin-stars',
+  Engaged: 'face-smile',
+  Calm: 'face-meh',
+  Stuck: 'face-sad-tear',
+  Crushed: 'face-cry',
+};
+const RADAR_SIZE = 320;
 const RADAR_CENTER = RADAR_SIZE / 2;
-const RADAR_RADIUS = 78;
+const RADAR_RADIUS = 96;
 const RADAR_LEVELS = 4;
 const SESSION_GAP_MINUTES = 30;
 const COUNTED_GAP_CAP_MINUTES = 5;
@@ -271,8 +278,6 @@ export default function ProfileScreen() {
       const angle = -Math.PI / 2 + (Math.PI * 2 * index) / MOOD_ORDER.length;
       const outerX = RADAR_CENTER + Math.cos(angle) * RADAR_RADIUS;
       const outerY = RADAR_CENTER + Math.sin(angle) * RADAR_RADIUS;
-      const labelX = RADAR_CENTER + Math.cos(angle) * (RADAR_RADIUS + 28);
-      const labelY = RADAR_CENTER + Math.sin(angle) * (RADAR_RADIUS + 28);
       const value = moodDistribution[mood];
       const ratio = value / maxMoodCount;
       const pointX = RADAR_CENTER + Math.cos(angle) * RADAR_RADIUS * ratio;
@@ -280,10 +285,9 @@ export default function ProfileScreen() {
 
       return {
         mood,
+        angle,
         outerX,
         outerY,
-        labelX,
-        labelY,
         pointX,
         pointY,
         value,
@@ -306,6 +310,23 @@ export default function ProfileScreen() {
           return `${x},${y}`;
         })
         .join(' ');
+    }),
+    [radarAxes]
+  );
+
+  const radarMetaAnchors = useMemo(
+    () => radarAxes.map((axis) => {
+      const iconOffset = RADAR_RADIUS + 60;
+      const labelOffset = RADAR_RADIUS + 34;
+
+      return {
+        mood: axis.mood,
+        value: axis.value,
+        iconX: RADAR_CENTER + Math.cos(axis.angle) * iconOffset,
+        iconY: RADAR_CENTER + Math.sin(axis.angle) * iconOffset,
+        labelX: RADAR_CENTER + Math.cos(axis.angle) * labelOffset,
+        labelY: RADAR_CENTER + Math.sin(axis.angle) * labelOffset,
+      };
     }),
     [radarAxes]
   );
@@ -574,101 +595,96 @@ export default function ProfileScreen() {
               Mood Distribution
             </Text>
             <View
-              className="rounded-[24px] border p-4"
+              className="rounded-[30px] border px-4 py-5"
               style={{
                 ...CARD_SHADOW,
                 borderColor: TOKENS.colors.borderSoft,
-                backgroundColor: TOKENS.colors.surface,
+                backgroundColor: '#f8f9fb',
               }}
             >
-              <View className="flex-row items-center justify-between mb-4">
-                <Text className="text-[16px] leading-[24px] font-medium" style={{ color: TOKENS.colors.text }}>
-                  Mood Distribution
-                </Text>
-                <Text className="text-[12px] leading-[16px] font-semibold" style={{ color: TOKENS.colors.mutedText }}>
-                  {moodHistory.length} total records
-                </Text>
-              </View>
+              <View className="items-center justify-center rounded-[24px] border py-4" style={{ borderColor: '#e5e7eb', backgroundColor: '#f8f9fb' }}>
+                <View style={{ width: RADAR_SIZE, height: RADAR_SIZE, position: 'relative' }}>
+                  <Svg width={RADAR_SIZE} height={RADAR_SIZE}>
+                    {radarGridPolygons.map((points, index) => (
+                      <Polygon
+                        key={`grid-${index}`}
+                        points={points}
+                        fill={index === RADAR_LEVELS - 1 ? '#f8f9fb' : 'transparent'}
+                        stroke="#cfd2d8"
+                        strokeWidth={1}
+                      />
+                    ))}
 
-              <View className="items-center justify-center rounded-[24px] border py-4" style={{ borderColor: TOKENS.colors.borderSoft, backgroundColor: TOKENS.colors.surfaceSubtle }}>
-                <Svg width={RADAR_SIZE} height={RADAR_SIZE}>
-                  {radarGridPolygons.map((points, index) => (
+                    {radarAxes.map((axis) => (
+                      <Line
+                        key={`axis-${axis.mood}`}
+                        x1={RADAR_CENTER}
+                        y1={RADAR_CENTER}
+                        x2={axis.outerX}
+                        y2={axis.outerY}
+                        stroke="#cfd2d8"
+                        strokeWidth={1}
+                      />
+                    ))}
+
                     <Polygon
-                      key={`grid-${index}`}
-                      points={points}
-                      fill={index === RADAR_LEVELS - 1 ? '#f9f5f7' : 'transparent'}
-                      stroke="#d4d7dc"
-                      strokeWidth={1}
+                      points={radarPolygonPoints}
+                      fill="rgba(255, 0, 64, 0.16)"
+                      stroke={TOKENS.colors.primary}
+                      strokeWidth={2.5}
                     />
-                  ))}
 
-                  {radarAxes.map((axis) => (
-                    <Line
-                      key={`axis-${axis.mood}`}
-                      x1={RADAR_CENTER}
-                      y1={RADAR_CENTER}
-                      x2={axis.outerX}
-                      y2={axis.outerY}
-                      stroke="#d4d7dc"
-                      strokeWidth={1}
-                    />
-                  ))}
+                    {radarAxes.map((axis) => (
+                      <Circle
+                        key={`point-${axis.mood}`}
+                        cx={axis.pointX}
+                        cy={axis.pointY}
+                        r={5}
+                        fill={TOKENS.colors.primary}
+                      />
+                    ))}
+                  </Svg>
 
-                  <Polygon
-                    points={radarPolygonPoints}
-                    fill="rgba(255, 0, 64, 0.18)"
-                    stroke={TOKENS.colors.primary}
-                    strokeWidth={2.5}
-                  />
-
-                  {radarAxes.map((axis) => (
-                    <Circle
-                      key={`point-${axis.mood}`}
-                      cx={axis.pointX}
-                      cy={axis.pointY}
-                      r={4.5}
-                      fill={TOKENS.colors.primary}
-                      stroke="#fff"
-                      strokeWidth={2}
-                    />
-                  ))}
-
-                  {radarAxes.map((axis) => (
-                    <SvgText
-                      key={`label-${axis.mood}`}
-                      x={axis.labelX}
-                      y={axis.labelY}
-                      fontSize="11"
-                      fontWeight="600"
-                      fill={TOKENS.colors.mutedText}
-                      textAnchor="middle"
+                  {radarMetaAnchors.map((anchor) => (
+                    <View
+                      key={`icon-${anchor.mood}`}
+                      pointerEvents="none"
+                      style={{
+                        position: 'absolute',
+                        left: anchor.iconX - 16,
+                        top: anchor.iconY - 16,
+                        width: 32,
+                        height: 32,
+                        borderRadius: 16,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: '#ffd230',
+                        borderWidth: 1,
+                        borderColor: '#f5c31f',
+                      }}
                     >
-                      {MOOD_CONFIG[axis.mood].label}
-                    </SvgText>
+                      <FontAwesome6 name={MOOD_ICON_MAP[anchor.mood] as any} size={16} color="#2b3038" />
+                    </View>
                   ))}
-                </Svg>
-              </View>
 
-              <View className="flex-row flex-wrap justify-between gap-y-3 mt-4">
-                {MOOD_ORDER.map((mood) => (
-                  <View
-                    key={mood}
-                    className="w-[48%] rounded-2xl px-3 py-3 border"
-                    style={{ borderColor: TOKENS.colors.borderSoft, backgroundColor: TOKENS.colors.surfaceSubtle }}
-                  >
-                    <View className="flex-row items-center justify-between">
-                      <View className="flex-row items-center flex-1 pr-2">
-                        <FontAwesome6 name={MOOD_CONFIG[mood].icon as any} size={13} color={MOOD_CONFIG[mood].color} />
-                        <Text className="text-[14px] leading-[20px] ml-2" style={{ color: TOKENS.colors.text }}>
-                          {MOOD_CONFIG[mood].label}
-                        </Text>
-                      </View>
-                      <Text className="text-[12px] leading-[16px] font-semibold" style={{ color: TOKENS.colors.mutedText }}>
-                        {moodDistribution[mood]}
+                  {radarMetaAnchors.map((anchor) => (
+                    <View
+                      key={`label-${anchor.mood}`}
+                      pointerEvents="none"
+                      style={{
+                        position: 'absolute',
+                        left: anchor.labelX - 56,
+                        top: anchor.labelY - 8,
+                        width: 112,
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Text className="text-[12px] leading-[16px] font-medium" style={{ color: '#272b34' }}>
+                        {`${MOOD_CONFIG[anchor.mood].label} (${anchor.value})`}
                       </Text>
                     </View>
-                  </View>
-                ))}
+                  ))}
+                </View>
               </View>
             </View>
           </View>
