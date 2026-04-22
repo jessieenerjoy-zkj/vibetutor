@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,9 +15,12 @@ import {
   NativeScrollEvent,
   NativeSyntheticEvent,
   useWindowDimensions,
+  Share,
+  AppState,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Audio } from 'expo-av';
+import Svg, { Circle } from 'react-native-svg';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -27,6 +30,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { Screen } from '@/components/Screen';
+import { useSafeRouter, useSafeSearchParams } from '@/hooks/useSafeRouter';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -50,6 +54,13 @@ import {
   getTodayDrops,
   clearChatHistory,
   subscribeToDataReset,
+  trackLocalEvent,
+  extractSubjectTag,
+  recordTutorSolvedSubject,
+  getTodayStudyReportData,
+  recordTutorFocusDuration,
+  type SubjectBreakdown,
+  type TodayStudyReportData,
 } from '@/utils/storage';
 
 // 动态加载动画组件 - 三个点依次闪烁
@@ -143,11 +154,42 @@ const PERSONA_AVATARS: Record<TutorPersona, number> = {
   Sherlock: require('@/assets/images/personas/sherlock.png'),
 };
 
+const FINISH_LEARNING_EMPTY_TOAST = "You haven't solved any problems yet today. Let's get started!";
+const FOCUS_TICK_SECONDS = 10;
+
+const REPORT_SUBJECT_LABELS: Array<{ key: keyof SubjectBreakdown; label: string }> = [
+  { key: 'Math', label: 'Math' },
+  { key: 'Physics', label: 'Physics' },
+  { key: 'Chemistry', label: 'Chemistry' },
+  { key: 'History', label: 'History' },
+  { key: 'Other', label: 'Other' },
+];
+
+const REPORT_SUBJECT_COLORS: Record<keyof SubjectBreakdown, string> = {
+  Math: '#FF0040',
+  Physics: '#7C3AED',
+  Chemistry: '#F59E0B',
+  History: '#16A4E0',
+  Other: '#94A3B8',
+};
+
+const REPORT_DONUT_SIZE = 184;
+const REPORT_DONUT_STROKE_WIDTH = 24;
+const REPORT_DONUT_RADIUS = (REPORT_DONUT_SIZE - REPORT_DONUT_STROKE_WIDTH) / 2;
+const REPORT_DONUT_CIRCUMFERENCE = 2 * Math.PI * REPORT_DONUT_RADIUS;
+
 export default function TutorScreen() {
+  const router = useSafeRouter();
+  const params = useSafeSearchParams<{
+    openReport?: boolean;
+    reportLaunchToken?: number;
+  }>();
   const scrollViewRef = useRef<ScrollView>(null);
   const styleListRef = useRef<FlatList<TutorPersona>>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
   const webAudioUrlRef = useRef<string | null>(null);
+  const reportLaunchHandledRef = useRef<string | null>(null);
+  const focusIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const [currentPersona, setCurrentPersona] = useState<TutorPersona>('Einstein');
@@ -165,6 +207,10 @@ export default function TutorScreen() {
   const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
   const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
   const [personaVoicePreferences, setPersonaVoicePreferences] = useState<Partial<Record<TutorPersona, TtsVoice>>>({});
+  const [showFinishModal, setShowFinishModal] = useState(false);
+  const [showReportCard, setShowReportCard] = useState(false);
+  const [reportData, setReportData] = useState<TodayStudyReportData | null>(null);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const latestAssistantMessageIdRef = useRef<string | null>(null);
   const lastAutoWelcomedKeyRef = useRef<string | null>(null);
   const previewPersona = PERSONA_CONFIG[selectedStylePersona];
@@ -221,6 +267,72 @@ export default function TutorScreen() {
     useCallback(() => {
       loadData();
     }, [loadData])
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      const appStateSubscription = AppState.addEventListener('change', (state) => {
+        const canStartOnWeb =
+          Platform.OS !== 'web' || typeof document === 'undefined' || document.visibilityState === 'visible';
+
+        if (state === 'active' && canStartOnWeb) {
+          if (!focusIntervalRef.current) {
+            focusIntervalRef.current = setInterval(() => {
+              void recordTutorFocusDuration(FOCUS_TICK_SECONDS);
+            }, FOCUS_TICK_SECONDS * 1000);
+          }
+        } else if (focusIntervalRef.current) {
+          clearInterval(focusIntervalRef.current);
+          focusIntervalRef.current = null;
+        }
+      });
+
+      const canStartImmediately =
+        AppState.currentState === 'active' &&
+        (Platform.OS !== 'web' || typeof document === 'undefined' || document.visibilityState === 'visible');
+
+      if (canStartImmediately && !focusIntervalRef.current) {
+        focusIntervalRef.current = setInterval(() => {
+          void recordTutorFocusDuration(FOCUS_TICK_SECONDS);
+        }, FOCUS_TICK_SECONDS * 1000);
+      }
+
+      const visibilityCleanup =
+        Platform.OS === 'web' && typeof document !== 'undefined'
+          ? (() => {
+              const onVisibilityChange = () => {
+                if (document.visibilityState === 'visible') {
+                  if (!focusIntervalRef.current) {
+                    focusIntervalRef.current = setInterval(() => {
+                      void recordTutorFocusDuration(FOCUS_TICK_SECONDS);
+                    }, FOCUS_TICK_SECONDS * 1000);
+                  }
+                } else if (focusIntervalRef.current) {
+                  clearInterval(focusIntervalRef.current);
+                  focusIntervalRef.current = null;
+                }
+              };
+
+              document.addEventListener('visibilitychange', onVisibilityChange);
+              onVisibilityChange();
+
+              return () => {
+                document.removeEventListener('visibilitychange', onVisibilityChange);
+              };
+            })()
+          : null;
+
+      return () => {
+        appStateSubscription.remove();
+        if (visibilityCleanup) {
+          visibilityCleanup();
+        }
+        if (focusIntervalRef.current) {
+          clearInterval(focusIntervalRef.current);
+          focusIntervalRef.current = null;
+        }
+      };
+    }, [])
   );
 
   useEffect(() => {
@@ -511,6 +623,160 @@ export default function TutorScreen() {
     scrollToBottom();
   }, [selectedStylePersona]);
 
+  const handleOpenFinishLearning = useCallback(async () => {
+    const todaySolved = await getTodayDrops();
+
+    await trackLocalEvent('click_finish_learning', {
+      today_solved: todaySolved,
+    });
+
+    if (todaySolved <= 0) {
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.alert(FINISH_LEARNING_EMPTY_TOAST);
+      } else {
+        Alert.alert('No progress yet', FINISH_LEARNING_EMPTY_TOAST);
+      }
+      return;
+    }
+
+    setShowFinishModal(true);
+  }, []);
+
+  const handleGenerateReport = useCallback(async () => {
+    setShowFinishModal(false);
+    setIsGeneratingReport(true);
+
+    try {
+      const report = await getTodayStudyReportData();
+      setReportData(report);
+
+      await trackLocalEvent('generate_report_card', {
+        total_mins: report.totalMins,
+        total_solved: report.totalSolved,
+      });
+
+      setShowReportCard(true);
+    } catch (error) {
+      console.error('Failed to generate report card:', error);
+      Alert.alert('Failed to generate report', 'Please try again in a moment.');
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!params.openReport) {
+      return;
+    }
+
+    const reportLaunchKey = String(params.reportLaunchToken || 'default');
+    if (reportLaunchHandledRef.current === reportLaunchKey) {
+      return;
+    }
+
+    if (showReportCard || isGeneratingReport) {
+      return;
+    }
+
+    reportLaunchHandledRef.current = reportLaunchKey;
+    void handleGenerateReport();
+  }, [handleGenerateReport, isGeneratingReport, params.openReport, params.reportLaunchToken, showReportCard]);
+
+  const handleShareReport = useCallback(async () => {
+    if (!reportData) {
+      return;
+    }
+
+    const breakdownText = REPORT_SUBJECT_LABELS
+      .map(({ key, label }) => `${label}: ${reportData.subjectBreakdown[key]}`)
+      .join(' · ');
+
+    const message = [
+      'Gauth Study Report Card',
+      `Today’s Focus Time: ${reportData.totalMins} min`,
+      `Problems Solved: ${reportData.totalSolved}`,
+      `Subject Breakdown: ${breakdownText}`,
+    ].join('\n');
+
+    let shareTarget = 'copy';
+
+    try {
+      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && (navigator as any).share) {
+        await (navigator as any).share({
+          title: 'Gauth Study Report Card',
+          text: message,
+        });
+        shareTarget = 'ig';
+      } else {
+        await Share.share({ message, title: 'Gauth Study Report Card' });
+        shareTarget = 'tiktok';
+      }
+    } catch (error) {
+      if (String(error).toLowerCase().includes('abort')) {
+        return;
+      }
+      shareTarget = 'copy';
+      console.error('Share report failed:', error);
+      Alert.alert('Share failed', 'Please try again.');
+    } finally {
+      await trackLocalEvent('share_report_card', {
+        share_target: shareTarget,
+      });
+    }
+  }, [reportData]);
+
+  const reportBreakdownRows = useMemo(() => {
+    const breakdown = reportData?.subjectBreakdown;
+    const total = breakdown ? Object.values(breakdown).reduce((sum, count) => sum + count, 0) : 0;
+
+    return REPORT_SUBJECT_LABELS.map(({ key, label }) => {
+      const value = breakdown?.[key] ?? 0;
+
+      return {
+        key,
+        label,
+        value,
+        color: REPORT_SUBJECT_COLORS[key],
+        percent: total > 0 ? Math.round((value / total) * 100) : 0,
+      };
+    });
+  }, [reportData]);
+
+  const totalSubjectsSolved = useMemo(() => {
+    return reportBreakdownRows.reduce((sum, item) => sum + item.value, 0);
+  }, [reportBreakdownRows]);
+
+  const reportDisplayRows = useMemo(() => {
+    return reportBreakdownRows.filter((item) => item.key !== 'Other' || item.value > 0);
+  }, [reportBreakdownRows]);
+
+  const reportDonutSegments = useMemo(() => {
+    const chartRows = reportDisplayRows.length > 0 ? reportDisplayRows : reportBreakdownRows;
+    const rowsWithValue = chartRows.some((item) => item.value > 0)
+      ? chartRows
+      : chartRows.map((item) => ({
+          ...item,
+          value: 1,
+        }));
+    const total = rowsWithValue.reduce((sum, item) => sum + item.value, 0);
+
+    let accumulatedRatio = 0;
+
+    return rowsWithValue.map((item) => {
+      const ratio = total > 0 ? item.value / total : 0;
+      const dashLength = ratio * REPORT_DONUT_CIRCUMFERENCE;
+      const segment = {
+        key: item.key,
+        color: item.color,
+        strokeDasharray: `${dashLength} ${REPORT_DONUT_CIRCUMFERENCE}`,
+        strokeDashoffset: -accumulatedRatio * REPORT_DONUT_CIRCUMFERENCE,
+      };
+
+      accumulatedRatio += ratio;
+      return segment;
+    });
+  }, [reportBreakdownRows, reportDisplayRows]);
+
   // OCR识别图片文字
   const recognizeImageText = async (imageUri: string): Promise<string | null> => {
     setIsRecognizing(true);
@@ -671,10 +937,11 @@ export default function TutorScreen() {
 
       if (response.ok) {
         const data = await response.json();
+        const parsedReply = extractSubjectTag(data.content);
         const assistantMessage: ChatMessage = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
-          content: data.content,
+          content: parsedReply.content,
           timestamp: new Date(),
         };
 
@@ -689,6 +956,8 @@ export default function TutorScreen() {
 
         const newDrops = await addDrop();
         setTodayDrops(newDrops);
+
+        await recordTutorSolvedSubject(parsedReply.subject);
 
         if (newDrops >= 10) {
           Alert.alert('满杯达成!', '恭喜你完成了今日学习目标!');
@@ -716,6 +985,36 @@ export default function TutorScreen() {
     <Screen safeAreaEdges={['left', 'right', 'bottom']}>
       <View className="flex-1 relative">
         <View className="absolute top-0 left-0 right-0 z-20">
+          <View
+            className="px-5"
+            style={{
+              paddingTop: insets.top + 10,
+              marginBottom: 8,
+            }}
+          >
+            <View className="flex-row items-center justify-end gap-3">
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  void handleOpenFinishLearning();
+                }}
+                className="flex-row items-center rounded-full border border-[#F2E6EA] bg-[#FFF7F9] px-3 py-1.5"
+              >
+                <FontAwesome6 name="flag-checkered" size={11} color="#D93A6A" />
+                <Text className="ml-1.5 text-xs font-semibold text-[#D93A6A]">Finish Learning</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => {
+                  router.push('/');
+                }}
+                className="h-9 w-9 items-center justify-center rounded-full bg-white/90"
+              >
+                <FontAwesome6 name="house" size={16} color="var(--color-muted)" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
           <TouchableOpacity
             activeOpacity={0.92}
             onPress={() => setIsProfileExpanded((prev) => !prev)}
@@ -840,7 +1139,7 @@ export default function TutorScreen() {
           className="flex-1 px-5"
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
-            paddingTop: isProfileExpanded ? insets.top + 380 : insets.top + 140,
+            paddingTop: isProfileExpanded ? insets.top + 430 : insets.top + 190,
             paddingBottom: keyboardHeight > 0 ? 16 : 8,
           }}
         >
@@ -1015,6 +1314,213 @@ export default function TutorScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        <Modal
+          visible={showFinishModal}
+          animationType="fade"
+          transparent
+          onRequestClose={() => setShowFinishModal(false)}
+        >
+          <View className="flex-1 items-center justify-center px-5">
+            <TouchableOpacity
+              activeOpacity={1}
+              onPress={() => setShowFinishModal(false)}
+              className="absolute inset-0 bg-black/45"
+            />
+            <View
+              className="w-full max-w-[760px] rounded-[40px] bg-white px-6 py-7"
+              style={{
+                shadowColor: '#120811',
+                shadowOffset: { width: 0, height: 12 },
+                shadowOpacity: 0.16,
+                shadowRadius: 24,
+                elevation: 8,
+              }}
+            >
+              <Text allowFontScaling={false} className="text-center text-[40px] font-black tracking-[-0.8px] text-[#140B16]">
+                Wrap up for today?
+              </Text>
+              <Text allowFontScaling={false} className="mt-4 text-center text-[18px] leading-[27px] text-[#5A667A]">
+                You can keep going or generate your study report card now.
+              </Text>
+              <View className="mt-8 flex-row gap-4">
+                <TouchableOpacity
+                  className="h-[72px] flex-1 items-center justify-center rounded-[24px] border-[2px] border-[#FF0B4F] bg-white"
+                  activeOpacity={0.85}
+                  onPress={() => setShowFinishModal(false)}
+                >
+                  <Text allowFontScaling={false} className="text-[16px] font-bold text-[#09070D]">
+                    Keep Learning
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  className="h-[72px] flex-1 items-center justify-center rounded-[24px] bg-[#FF0040] px-3"
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    void handleGenerateReport();
+                  }}
+                >
+                  <Text allowFontScaling={false} className="text-center text-[16px] font-bold leading-[22px] text-white">
+                    Generate Report
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        <Modal
+          visible={showReportCard}
+          animationType="slide"
+          transparent={false}
+          onRequestClose={() => setShowReportCard(false)}
+        >
+          <View className="flex-1 bg-[#F9F2F7]">
+            <ScrollView
+              className="flex-1"
+              contentContainerStyle={{ paddingHorizontal: 22, paddingTop: 40, paddingBottom: 26 }}
+              showsVerticalScrollIndicator={false}
+            >
+              <Text className="mt-2 text-center text-[20px] font-bold tracking-[-0.2px] text-[#221A22]">
+                Daily Learning Report
+              </Text>
+              <Text className="mt-2 text-center text-[12px] leading-[18px] text-[#5F4A56]">
+                You have completed today&apos;s learning tasks
+              </Text>
+
+              <View className="mt-6 flex-row gap-4">
+                <View
+                  className="flex-1 rounded-[18px] border border-[#E5DFE3] bg-[#FAF9FA] px-4 py-4"
+                  style={{
+                    shadowColor: '#2B1D24',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.05,
+                    shadowRadius: 10,
+                    elevation: 2,
+                  }}
+                >
+                  <Text className="text-[14px] leading-[19px] text-[#4D3843]">Problem Solved</Text>
+                  <Text className="mt-3 text-[22px] font-bold text-[#FF184F]">
+                    {reportData?.totalSolved ?? 0} Questions
+                  </Text>
+                </View>
+
+                <View
+                  className="flex-1 rounded-[18px] border border-[#E5DFE3] bg-[#FAF9FA] px-4 py-4"
+                  style={{
+                    shadowColor: '#2B1D24',
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.05,
+                    shadowRadius: 10,
+                    elevation: 2,
+                  }}
+                >
+                  <Text className="text-center text-[14px] leading-[19px] text-[#4D3843]">Time Spent</Text>
+                  <View className="mt-3 flex-row items-center justify-center">
+                    <View className="mr-2 h-5 w-5 items-center justify-center rounded-full bg-[#FF184F]">
+                      <FontAwesome6 name="clock" size={9} color="#fff" />
+                    </View>
+                    <Text className="text-[22px] font-bold text-[#FF184F]">
+                      {reportData?.totalMins ?? 0} Minute
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              <View className="mt-5 rounded-[24px] border border-[#E5E6EA] bg-[#F8F8FA] px-4 py-5">
+                <Text className="text-[15px] font-semibold text-[#151318]">Subject Distribution</Text>
+
+                <View className="mt-4 items-center justify-center">
+                  <View className="h-[184px] w-[184px] items-center justify-center">
+                    <Svg
+                      width={REPORT_DONUT_SIZE}
+                      height={REPORT_DONUT_SIZE}
+                      style={{ transform: [{ rotate: '-90deg' }] }}
+                    >
+                      <Circle
+                        cx={REPORT_DONUT_SIZE / 2}
+                        cy={REPORT_DONUT_SIZE / 2}
+                        r={REPORT_DONUT_RADIUS}
+                        fill="none"
+                        stroke="#E3E5E8"
+                        strokeWidth={REPORT_DONUT_STROKE_WIDTH}
+                      />
+                      {reportDonutSegments.map((segment) => (
+                        <Circle
+                          key={segment.key}
+                          cx={REPORT_DONUT_SIZE / 2}
+                          cy={REPORT_DONUT_SIZE / 2}
+                          r={REPORT_DONUT_RADIUS}
+                          fill="none"
+                          stroke={segment.color}
+                          strokeWidth={REPORT_DONUT_STROKE_WIDTH}
+                          strokeLinecap="round"
+                          strokeDasharray={segment.strokeDasharray}
+                          strokeDashoffset={segment.strokeDashoffset}
+                        />
+                      ))}
+                    </Svg>
+                    <View className="absolute items-center justify-center">
+                      <Text className="text-[16px] font-medium text-[#201B21]">Total</Text>
+                      <Text className="text-[40px] leading-[44px] font-semibold text-[#201B21]">{totalSubjectsSolved}</Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View className="mt-4 gap-4">
+                  {reportDisplayRows.map((item) => (
+                    <View key={item.key}>
+                      <View className="flex-row items-center justify-between">
+                        <View className="flex-row items-center">
+                          <View
+                            className="mr-2 h-[12px] w-[12px] rounded-full"
+                            style={{ backgroundColor: item.color }}
+                          />
+                          <Text className="text-[14px] text-[#1F1A20]">{item.label}</Text>
+                        </View>
+                        <View className="flex-row items-center gap-3">
+                          <Text className="text-[14px] font-medium text-[#1F1A20]">{item.value} Questions</Text>
+                          <Text className="w-8 text-right text-[14px] text-[#3F2F37]">{item.percent}%</Text>
+                        </View>
+                      </View>
+                      <View className="mt-3 h-[6px] rounded-full bg-[#E0E2E6]">
+                        <View
+                          className="h-[6px] rounded-full"
+                          style={{
+                            width: `${item.percent}%`,
+                            backgroundColor: item.color,
+                          }}
+                        />
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </View>
+
+              <View className="mt-5 gap-3">
+                <TouchableOpacity
+                  activeOpacity={0.88}
+                  onPress={() => {
+                    void handleShareReport();
+                  }}
+                  className="items-center justify-center rounded-2xl bg-[#FF0040] px-4 py-4"
+                >
+                  <Text className="text-base font-semibold text-white">Share to IG/TikTok</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  activeOpacity={0.88}
+                  onPress={() => {
+                    setShowReportCard(false);
+                    router.push('/');
+                  }}
+                  className="items-center justify-center rounded-2xl border border-[#E7D4DC] bg-white px-4 py-4"
+                >
+                  <Text className="text-base font-semibold text-[#6D5A63]">Back to Home</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          </View>
+        </Modal>
 
         <Modal
           visible={isStylePickerVisible}
