@@ -1096,8 +1096,10 @@ export default function TutorScreen() {
               elevation: 8,
             }}
           >
-            <Text className="text-center text-[48px] font-black tracking-[-0.8px] text-[#140B16]">Wrap up for today?</Text>
-            <Text className="mt-4 text-center text-[20px] leading-[30px] text-[#5A667A]">
+            <Text allowFontScaling={false} className="text-center text-[48px] font-black tracking-[-0.8px] text-[#140B16]">
+              Wrap up for today?
+            </Text>
+            <Text allowFontScaling={false} className="mt-4 text-center text-[20px] leading-[30px] text-[#5A667A]">
               You can keep going or generate your study report card now.
             </Text>
             <View className="mt-8 flex-row gap-4">
@@ -1106,7 +1108,9 @@ export default function TutorScreen() {
                 activeOpacity={0.85}
                 onPress={() => setShowFinishModal(false)}
               >
-                <Text className="text-[16px] font-bold text-[#09070D]">Keep Learning</Text>
+                <Text allowFontScaling={false} className="text-[16px] font-bold text-[#09070D]">
+                  Keep Learning
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
                 className="h-[72px] flex-1 items-center justify-center rounded-[24px] bg-[#FF0040] px-3"
@@ -1115,7 +1119,9 @@ export default function TutorScreen() {
                   void handleGenerateReport();
                 }}
               >
-                <Text className="text-center text-[16px] font-bold leading-[22px] text-white">Yes, generate my report</Text>
+                <Text allowFontScaling={false} className="text-center text-[16px] font-bold leading-[22px] text-white">
+                  Generate Report
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
