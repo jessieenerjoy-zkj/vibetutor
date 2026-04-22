@@ -533,51 +533,35 @@ export default function ProfileScreen() {
           </View>
 
           <View className="mb-5">
-            <Text className="text-[20px] leading-[28px] font-semibold mb-3" style={{ color: TOKENS.colors.text }}>
-              Mood Trend
-            </Text>
+            <View className="flex-row items-center justify-between mb-3">
+              <Text className="text-[20px] leading-[28px] font-semibold" style={{ color: TOKENS.colors.text }}>
+                Mood Trend
+              </Text>
+              <View className="rounded-full px-4 py-2" style={{ backgroundColor: '#edeef1' }}>
+                <Text className="text-[12px] leading-[16px] font-semibold" style={{ color: '#5f646d' }}>
+                  Last 7 Days
+                </Text>
+              </View>
+            </View>
+
             <View
-              className="rounded-[24px] border p-4"
+              className="rounded-[30px] border px-4 py-6"
               style={{
                 ...CARD_SHADOW,
                 borderColor: TOKENS.colors.borderSoft,
-                backgroundColor: TOKENS.colors.surface,
+                backgroundColor: '#f8f9fb',
               }}
             >
-              <View className="flex-row items-center justify-between mb-4">
-                <Text className="text-[16px] leading-[24px] font-medium" style={{ color: TOKENS.colors.text }}>
-                  Mood Trend · Last 7 Days
-                </Text>
-                <View className="rounded-full px-3 py-1.5" style={{ backgroundColor: TOKENS.colors.surfaceSubtle }}>
-                  <Text className="text-[12px] leading-[16px] font-semibold" style={{ color: TOKENS.colors.mutedText }}>
-                    Last 7 Days
-                  </Text>
-                </View>
-              </View>
-
-              <View className="flex-row justify-between items-end mb-5 px-1">
+              <View className="flex-row justify-between items-end px-1">
                 {moodTrend.map((item, index) => (
                   <View key={item.date} className="items-center">
-                    <View className="w-9 h-9 rounded-full items-center justify-center mb-1.5" style={{ backgroundColor: TOKENS.colors.surfaceSubtle }}>
-                      <FontAwesome6
-                        name={MOOD_CONFIG[item.mood].icon as any}
-                        size={17}
-                        color={MOOD_CONFIG[item.mood].color}
-                      />
-                    </View>
-                    <Text className="text-[12px] leading-[16px] font-semibold" style={{ color: TOKENS.colors.mutedText }}>
-                      {index === 6 ? 'Today' : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][index]}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-
-              <View className="flex-row justify-center gap-4 pt-3 border-t" style={{ borderColor: TOKENS.colors.borderSoft }}>
-                {(Object.keys(MOOD_CONFIG) as MoodType[]).map((mood) => (
-                  <View key={mood} className="flex-row items-center">
-                    <FontAwesome6 name={MOOD_CONFIG[mood].icon as any} size={10} color={MOOD_CONFIG[mood].color} />
-                    <Text className="text-[12px] leading-[16px] font-semibold ml-1" style={{ color: TOKENS.colors.mutedText }}>
-                      {MOOD_CONFIG[mood].label}
+                    <FontAwesome6
+                      name={MOOD_CONFIG[item.mood].icon as any}
+                      size={24}
+                      color={MOOD_CONFIG[item.mood].color}
+                    />
+                    <Text className="text-[12px] leading-[16px] mt-2" style={{ color: '#5a5f68' }}>
+                      {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][index]}
                     </Text>
                   </View>
                 ))}
