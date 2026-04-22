@@ -35,25 +35,35 @@ interface StatCardProps {
   title: string;
   value: string | number;
   icon: string;
-  color: string;
+  iconBackground: string;
+  iconColor: string;
 }
 
-const StatCard = ({ title, value, icon, color }: StatCardProps) => (
+const CARD_SHADOW = {
+  shadowColor: '#251b2d',
+  shadowOffset: { width: 0, height: 6 },
+  shadowOpacity: 0.08,
+  shadowRadius: 16,
+  elevation: 2,
+};
+
+const StatCard = ({ title, value, icon, iconBackground, iconColor }: StatCardProps) => (
   <View
-    className="flex-1 bg-[var(--color-surface)] p-4 rounded-2xl items-center"
+    className="flex-1 rounded-3xl border border-[#d8d5df] bg-[#f7f6fa] px-3 py-4 items-center"
     style={{
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.04,
-      shadowRadius: 8,
-      elevation: 1,
+      ...CARD_SHADOW,
+      shadowOpacity: 0.05,
+      shadowRadius: 12,
     }}
   >
-    <View className={`w-10 h-10 ${color} rounded-full items-center justify-center mb-2`}>
-      <FontAwesome6 name={icon as any} size={16} color="#fff" />
+    <View
+      className="w-10 h-10 rounded-full items-center justify-center mb-3"
+      style={{ backgroundColor: iconBackground }}
+    >
+      <FontAwesome6 name={icon as any} size={15} color={iconColor} />
     </View>
-    <Text className="text-xl font-bold text-[var(--color-foreground)]">{value}</Text>
-    <Text className="text-xs text-[var(--color-muted)] mt-1 text-center">{title}</Text>
+    <Text className="text-[42px] leading-[42px] font-bold text-[#17131d] tracking-tight">{value}</Text>
+    <Text className="text-[21px] leading-[22px] text-[#2a2630] mt-1 text-center">{title}</Text>
   </View>
 );
 
@@ -222,6 +232,10 @@ export default function ProfileScreen() {
   const moodTrend = getMoodTrend();
   const moodDistribution = getMoodDistribution();
   const maxMoodCount = Math.max(...Object.values(moodDistribution), 1);
+  const focusStamp = resolvedSelectedStamp || currentStage;
+  const focusProgressRatio = focusStamp
+    ? Math.min(1, focusStamp.progressDays / focusStamp.targetDays)
+    : 1;
 
   const radarAxes = useMemo(() => {
     return MOOD_ORDER.map((mood, index) => {
@@ -268,64 +282,94 @@ export default function ProfileScreen() {
   );
 
   return (
-    <Screen>
+    <Screen backgroundColor="#e8e6ee">
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: 110 }}
       >
-        <View className="px-5 pt-4 pb-6">
-          <Text className="text-2xl font-bold text-[var(--color-foreground)] tracking-tight">
-            Profile
-          </Text>
-          <Text className="text-sm text-[var(--color-muted)] mt-1">
-            Track your learning journey
-          </Text>
-        </View>
-
-        <View className="px-5 mb-6">
+        <View className="px-4 pt-3 pb-4">
           <View
-            className="bg-[var(--color-surface)] rounded-3xl p-5"
-            style={{
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 1 },
-              shadowOpacity: 0.04,
-              shadowRadius: 8,
-              elevation: 1,
-            }}
+            className="rounded-[28px] border border-[#ebe9f0] bg-[#f7f6fa] px-5 pb-6 pt-4"
+            style={CARD_SHADOW}
           >
-            <Text className="text-xs font-medium text-[var(--color-muted)] uppercase tracking-wider mb-4">
-              My Study Stats
-            </Text>
-            <View className="flex-row gap-3">
-              <StatCard title="Total Drops" value={totalDrops} icon="droplet" color="bg-[#0284C7]" />
-              <StatCard title="Study Days" value={totalDays} icon="calendar" color="bg-[#8E7431]" />
-              <StatCard title="Study Time" value={formatStudyDuration(studyMinutes)} icon="clock" color="bg-[#10B981]" />
+            <View className="flex-row items-center justify-between">
+              <View className="w-9 h-9 rounded-xl bg-[#eceaf2] items-center justify-center">
+                <FontAwesome6 name="bars" size={15} color="#313046" />
+              </View>
+              <Text className="text-[34px] leading-[36px] font-semibold text-[#ff0a47] tracking-tight">Profile</Text>
+              <View className="w-9 h-9 rounded-xl bg-[#eceaf2] items-center justify-center">
+                <FontAwesome6 name="gear" size={16} color="#313046" />
+              </View>
+            </View>
+
+            <View className="items-center mt-7">
+              <View className="w-24 h-24 rounded-full border-[3px] border-[#ecebf1] bg-[#d9d8df] items-center justify-center">
+                <FontAwesome6 name="user" size={35} color="#5a5760" />
+              </View>
+
+              <Text className="text-[21px] leading-[24px] text-[#2b2631] mt-5 text-center">
+                Track your learning journey
+              </Text>
+
+              <View className="mt-4 rounded-full px-4 py-2 bg-[#efedf4] flex-row items-center">
+                <View className="w-2 h-2 rounded-full bg-[#ff0a47] mr-2" />
+                <Text className="text-[19px] leading-[20px] text-[#625d6c]">
+                  Today Drops {todayDrops}/{DAILY_DROP_LIMIT}
+                </Text>
+              </View>
             </View>
           </View>
         </View>
 
-        <View className="px-5 mb-6">
+        <View className="px-4 mb-6">
+          <Text className="text-[35px] leading-[38px] font-semibold text-[#16121c] mb-4">My Study Stats</Text>
           <View
-            className="bg-[var(--color-surface)] rounded-3xl p-5"
-            style={{
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 1 },
-              shadowOpacity: 0.04,
-              shadowRadius: 8,
-              elevation: 1,
-            }}
+            className="rounded-[30px] border border-[#e5e2eb] bg-[#f8f7fa] px-4 py-4"
+            style={CARD_SHADOW}
+          >
+            <View className="flex-row gap-3">
+              <StatCard
+                title="Total Drops"
+                value={totalDrops}
+                icon="droplet"
+                iconBackground="#ffd7e0"
+                iconColor="#d31646"
+              />
+              <StatCard
+                title="Study Days"
+                value={totalDays}
+                icon="calendar"
+                iconBackground="#e3ddff"
+                iconColor="#5a31f4"
+              />
+              <StatCard
+                title="Study Time"
+                value={formatStudyDuration(studyMinutes)}
+                icon="stopwatch"
+                iconBackground="#dae7ff"
+                iconColor="#2457ba"
+              />
+            </View>
+          </View>
+        </View>
+
+        <View className="px-4 mb-6">
+          <Text className="text-[35px] leading-[38px] font-semibold text-[#16121c] mb-4">Mind Garden</Text>
+          <View
+            className="rounded-[30px] border border-[#e5e2eb] bg-[#f8f7fa] p-4"
+            style={CARD_SHADOW}
           >
             <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-xs font-medium text-[var(--color-muted)] uppercase tracking-wider">
+              <Text className="text-[21px] leading-[24px] font-semibold text-[#4d4756]">
                 Mind Garden
               </Text>
-              <Text className="text-xs text-[var(--color-muted)]">
+              <Text className="text-[19px] leading-[20px] text-[#8f879c]">
                 {mindGardenState.completed ? 'All stamps unlocked' : 'Sequential unlock'}
               </Text>
             </View>
 
-            <View className="flex-row flex-wrap justify-between gap-y-4">
+            <View className="flex-row flex-wrap justify-between gap-y-6 pt-1">
               {mindGardenState.stamps.map((stamp) => {
                 const progressRatio = Math.min(1, stamp.progressDays / stamp.targetDays);
                 return (
@@ -333,42 +377,46 @@ export default function ProfileScreen() {
                     key={stamp.key}
                     activeOpacity={0.85}
                     onPress={() => setSelectedStamp(stamp)}
-                    className="w-[48%] rounded-[24px] px-4 py-4"
+                    className="w-[48%] rounded-[20px] px-3 py-3 items-center"
                     style={{
-                      backgroundColor: stamp.unlocked ? `${stamp.accentColor}14` : '#F3F4F6',
+                      backgroundColor: stamp.unlocked ? `${stamp.accentColor}10` : '#f4f3f8',
                       borderWidth: 1,
-                      borderColor: stamp.unlocked ? `${stamp.accentColor}40` : '#E5E7EB',
+                      borderColor: stamp.unlocked ? `${stamp.accentColor}38` : '#dfdce6',
                     }}
                   >
                     <View
-                      className="w-14 h-14 rounded-full items-center justify-center mb-3"
+                      className="w-[72px] h-[72px] rounded-full items-center justify-center mb-2"
                       style={{
-                        backgroundColor: stamp.unlocked ? `${stamp.accentColor}22` : '#E5E7EB',
+                        backgroundColor: stamp.unlocked ? `${stamp.accentColor}16` : '#f0eef4',
+                        borderWidth: 2,
+                        borderStyle: 'dashed',
+                        borderColor: stamp.unlocked ? `${stamp.accentColor}5a` : '#bdb9c8',
                       }}
                     >
                       <FontAwesome6
                         name={stamp.icon as any}
-                        size={24}
+                        size={23}
                         color={stamp.unlocked ? stamp.accentColor : '#9CA3AF'}
                       />
                     </View>
-                    <Text className="text-sm font-semibold text-[var(--color-foreground)]">
+                    <Text className="text-[20px] leading-[22px] text-[#5a5564]">
                       {stamp.englishLabel}
                     </Text>
-                    <Text className="text-xs text-[var(--color-muted)] mt-1">
+                    <View className="w-12 h-[3px] rounded-full bg-[#ddd9e3] mt-2" />
+                    <Text className="text-[17px] leading-[18px] text-[#8d8698] mt-2 text-center">
                       {stamp.unlocked ? `Unlocked · ${formatShortDate(stamp.unlockDate)}` : `${stamp.progressDays}/${stamp.targetDays} days`}
                     </Text>
-                    <View className="mt-3 h-2 rounded-full bg-white/70 overflow-hidden">
+                    <View className="mt-2 h-[6px] rounded-full bg-[#ebe7f0] overflow-hidden w-full">
                       <View
                         className="h-full rounded-full"
                         style={{
                           width: `${progressRatio * 100}%`,
-                          backgroundColor: stamp.unlocked ? stamp.accentColor : '#9CA3AF',
+                          backgroundColor: stamp.unlocked ? stamp.accentColor : '#aaa4b5',
                         }}
                       />
                     </View>
                     {stamp.isCurrent && !stamp.unlocked ? (
-                      <Text className="text-[11px] mt-2" style={{ color: stamp.accentColor }}>
+                      <Text className="text-[16px] leading-[17px] mt-2" style={{ color: stamp.accentColor }}>
                         Current challenge
                       </Text>
                     ) : null}
@@ -377,15 +425,31 @@ export default function ProfileScreen() {
               })}
             </View>
 
-            <View className="mt-5 rounded-2xl bg-[#F8FAFC] px-4 py-4">
-              <Text className="text-sm font-semibold text-[var(--color-foreground)]">
+            <View className="mt-5 rounded-2xl border border-[#dedbe4] bg-[#f5f3f8] px-4 py-4">
+              {focusStamp ? (
+                <Text className="text-[21px] leading-[22px] font-semibold text-[#292531]">
+                  {focusStamp.progressDays}/{focusStamp.targetDays}
+                </Text>
+              ) : null}
+
+              <View className="mt-2 h-[7px] rounded-full bg-[#e4e0e9] overflow-hidden">
+                <View
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${focusProgressRatio * 100}%`,
+                    backgroundColor: focusStamp?.accentColor || '#a09aa9',
+                  }}
+                />
+              </View>
+
+              <Text className="text-[22px] leading-[24px] font-semibold text-[#2c2735] mt-4">
                 {resolvedSelectedStamp
                   ? `Current target · ${resolvedSelectedStamp.englishLabel}`
                   : currentStage
                     ? `Current target · ${currentStage.englishLabel}`
                     : 'Mind Garden complete'}
               </Text>
-              <Text className="text-xs text-[var(--color-muted)] mt-1 leading-5">
+              <Text className="text-[17px] leading-[24px] text-[#7e778d] mt-2">
                 {resolvedSelectedStamp
                   ? getStampRequirementCopy(resolvedSelectedStamp)
                   : currentStage
@@ -393,7 +457,7 @@ export default function ProfileScreen() {
                     : 'You have completed all four stages. Keep learning to maintain your rhythm.'}
               </Text>
               {resolvedSelectedStamp ? (
-                <Text className="text-xs mt-3" style={{ color: resolvedSelectedStamp.accentColor }}>
+                <Text className="text-[17px] leading-[18px] mt-3" style={{ color: resolvedSelectedStamp.accentColor }}>
                   {getStampStatusCopy(resolvedSelectedStamp)}
                 </Text>
               ) : null}
@@ -401,39 +465,43 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <View className="px-5 mb-6">
+        <View className="px-4 mb-6">
+          <Text className="text-[35px] leading-[38px] font-semibold text-[#16121c] mb-4">Mood Trend</Text>
           <View
-            className="bg-[var(--color-surface)] rounded-3xl p-5"
-            style={{
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 1 },
-              shadowOpacity: 0.04,
-              shadowRadius: 8,
-              elevation: 1,
-            }}
+            className="rounded-[30px] border border-[#e5e2eb] bg-[#f8f7fa] p-4"
+            style={CARD_SHADOW}
           >
-            <Text className="text-xs font-medium text-[var(--color-muted)] uppercase tracking-wider mb-4">
-              Mood Trend · Last 7 Days
-            </Text>
-            <View className="flex-row justify-between items-end mb-5">
+            <View className="flex-row items-center justify-between mb-4">
+              <Text className="text-[21px] leading-[24px] font-semibold text-[#4d4756]">
+                Mood Trend · Last 7 Days
+              </Text>
+              <View className="rounded-full bg-[#edeaf3] px-3 py-1.5">
+                <Text className="text-[16px] leading-[17px] text-[#6f687c]">Last 7 Days</Text>
+              </View>
+            </View>
+
+            <View className="flex-row justify-between items-end mb-5 px-1">
               {moodTrend.map((item, index) => (
                 <View key={item.date} className="items-center">
-                  <FontAwesome6
-                    name={MOOD_CONFIG[item.mood].icon as any}
-                    size={22}
-                    color={MOOD_CONFIG[item.mood].color}
-                  />
-                  <Text className="text-xs text-[var(--color-muted)] mt-1.5">
+                  <View className="w-9 h-9 rounded-full bg-[#efedf4] items-center justify-center mb-1.5">
+                    <FontAwesome6
+                      name={MOOD_CONFIG[item.mood].icon as any}
+                      size={17}
+                      color={MOOD_CONFIG[item.mood].color}
+                    />
+                  </View>
+                  <Text className="text-[16px] leading-[16px] text-[#867f93]">
                     {index === 6 ? 'Today' : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][index]}
                   </Text>
                 </View>
               ))}
             </View>
-            <View className="flex-row justify-center gap-4 pt-3 border-t border-[var(--color-separator)]">
+
+            <View className="flex-row justify-center gap-4 pt-3 border-t border-[#e4e1ea]">
               {(Object.keys(MOOD_CONFIG) as MoodType[]).map((mood) => (
                 <View key={mood} className="flex-row items-center">
                   <FontAwesome6 name={MOOD_CONFIG[mood].icon as any} size={10} color={MOOD_CONFIG[mood].color} />
-                  <Text className="text-xs text-[var(--color-muted)] ml-1">
+                  <Text className="text-[15px] leading-[16px] text-[#8a8396] ml-1">
                     {MOOD_CONFIG[mood].label}
                   </Text>
                 </View>
@@ -442,34 +510,29 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <View className="px-5 mb-6">
+        <View className="px-4 mb-6">
+          <Text className="text-[35px] leading-[38px] font-semibold text-[#16121c] mb-4">Mood Distribution</Text>
           <View
-            className="bg-[var(--color-surface)] rounded-3xl p-5"
-            style={{
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 1 },
-              shadowOpacity: 0.04,
-              shadowRadius: 8,
-              elevation: 1,
-            }}
+            className="rounded-[30px] border border-[#e5e2eb] bg-[#f8f7fa] p-4"
+            style={CARD_SHADOW}
           >
             <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-xs font-medium text-[var(--color-muted)] uppercase tracking-wider">
+              <Text className="text-[21px] leading-[24px] font-semibold text-[#4d4756]">
                 Mood Distribution
               </Text>
-              <Text className="text-xs text-[var(--color-muted)]">
+              <Text className="text-[17px] leading-[18px] text-[#8f879c]">
                 {moodHistory.length} total records
               </Text>
             </View>
 
-            <View className="items-center justify-center rounded-[28px] bg-[#F8FAFC] py-4">
+            <View className="items-center justify-center rounded-[24px] border border-[#e2d9df] bg-[#f6f2f5] py-4">
               <Svg width={RADAR_SIZE} height={RADAR_SIZE}>
                 {radarGridPolygons.map((points, index) => (
                   <Polygon
                     key={`grid-${index}`}
                     points={points}
-                    fill={index === RADAR_LEVELS - 1 ? '#F8FAFC' : 'transparent'}
-                    stroke="#D6DCE5"
+                    fill={index === RADAR_LEVELS - 1 ? '#f9f3f5' : 'transparent'}
+                    stroke="#cfccd6"
                     strokeWidth={1}
                   />
                 ))}
@@ -481,15 +544,15 @@ export default function ProfileScreen() {
                     y1={RADAR_CENTER}
                     x2={axis.outerX}
                     y2={axis.outerY}
-                    stroke="#D6DCE5"
+                    stroke="#cfccd6"
                     strokeWidth={1}
                   />
                 ))}
 
                 <Polygon
                   points={radarPolygonPoints}
-                  fill="rgba(14, 165, 233, 0.18)"
-                  stroke="#0EA5E9"
+                  fill="rgba(255, 10, 71, 0.2)"
+                  stroke="#ff0a47"
                   strokeWidth={2.5}
                 />
 
@@ -499,7 +562,7 @@ export default function ProfileScreen() {
                     cx={axis.pointX}
                     cy={axis.pointY}
                     r={4.5}
-                    fill={MOOD_CONFIG[axis.mood].color}
+                    fill="#ff0a47"
                     stroke="#fff"
                     strokeWidth={2}
                   />
@@ -512,7 +575,7 @@ export default function ProfileScreen() {
                     y={axis.labelY}
                     fontSize="11"
                     fontWeight="600"
-                    fill="#5B6472"
+                    fill="#5a5465"
                     textAnchor="middle"
                   >
                     {MOOD_CONFIG[axis.mood].label}
@@ -525,16 +588,16 @@ export default function ProfileScreen() {
               {MOOD_ORDER.map((mood) => (
                 <View
                   key={mood}
-                  className="w-[48%] rounded-2xl px-3 py-3 bg-[#F8FAFC]"
+                  className="w-[48%] rounded-2xl px-3 py-3 bg-[#f1eef4] border border-[#e3dfe8]"
                 >
                   <View className="flex-row items-center justify-between">
                     <View className="flex-row items-center flex-1 pr-2">
                       <FontAwesome6 name={MOOD_CONFIG[mood].icon as any} size={13} color={MOOD_CONFIG[mood].color} />
-                      <Text className="text-sm text-[var(--color-foreground)] ml-2">
+                      <Text className="text-[18px] leading-[20px] text-[#2f2a37] ml-2">
                         {MOOD_CONFIG[mood].label}
                       </Text>
                     </View>
-                    <Text className="text-xs font-semibold text-[var(--color-muted)]">
+                    <Text className="text-[18px] leading-[20px] font-semibold text-[#7e778d]">
                       {moodDistribution[mood]}
                     </Text>
                   </View>
@@ -544,43 +607,25 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        <View className="px-5 mb-6">
+        <View className="px-4 mb-6">
           <View
-            className="bg-[var(--color-surface)] rounded-3xl overflow-hidden"
-            style={{
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 1 },
-              shadowOpacity: 0.04,
-              shadowRadius: 8,
-              elevation: 1,
-            }}
+            className="rounded-[30px] border border-[#e5e2eb] bg-[#f8f7fa] overflow-hidden px-4 py-4"
+            style={CARD_SHADOW}
           >
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => router.push('/tutor')}
-              className="flex-row items-center justify-between px-5 py-4"
+              className="rounded-2xl bg-[#ff0a47] px-5 py-4 items-center justify-center"
             >
-              <View className="flex-row items-center">
-                <View className="w-10 h-10 bg-[#8E7431]/10 rounded-full items-center justify-center mr-3">
-                  <FontAwesome6 name="robot" size={18} color="#8E7431" />
-                </View>
-                <Text className="text-sm text-[var(--color-foreground)]">Start Learning</Text>
-              </View>
-              <FontAwesome6 name="chevron-right" size={14} color="var(--color-muted)" />
+              <Text className="text-[24px] leading-[26px] text-white font-semibold">Start Learning</Text>
             </TouchableOpacity>
-            <View className="h-px bg-[var(--color-separator)] mx-5" />
+
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={handleClearData}
-              className="flex-row items-center justify-between px-5 py-4"
+              className="rounded-2xl border border-[#c9bbc2] bg-[#f2eff3] px-5 py-4 items-center justify-center mt-4"
             >
-              <View className="flex-row items-center">
-                <View className="w-10 h-10 bg-[#FF3B30]/10 rounded-full items-center justify-center mr-3">
-                  <FontAwesome6 name="trash" size={18} color="#FF3B30" />
-                </View>
-                <Text className="text-sm text-[#FF3B30]">Clear Data</Text>
-              </View>
-              <FontAwesome6 name="chevron-right" size={14} color="var(--color-muted)" />
+              <Text className="text-[24px] leading-[26px] text-[#352b34] font-medium">Clear Data</Text>
             </TouchableOpacity>
           </View>
         </View>
