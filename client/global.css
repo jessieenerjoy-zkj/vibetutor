@@ -1,0 +1,323 @@
+@import 'tailwindcss';
+@import 'uniwind';
+@import './heroui/styles';
+
+@theme {
+  /* Primitive Colors (Do not change between light and dark) */
+  --white: oklch(100% 0 0);
+  --black: oklch(0% 0 0);
+  --snow: oklch(0.9911 0 0);
+  --eclipse: oklch(0.2103 0.0059 285.89);
+
+  /* Border */
+  --border-width: 1px;
+  --field-border-width: 0px;
+
+  /* Base radius - Golden Earth: Maximum roundedness (pill-shaped) */
+  --radius: 0.75rem;
+  --radius-sm: 0.5rem;
+  --radius-md: 1rem;
+  --radius-lg: 1.5rem;
+  --radius-xl: 2rem;
+  --radius-2xl: 3rem;
+  --radius-full: 9999px;
+  --field-radius: calc(var(--radius-xl));
+
+  /* Opacity */
+  --opacity-disabled: 0.5;
+}
+
+@layer theme {
+  :root {
+    @variant light {
+      /* Luminous Learning - Airy, optimistic light theme */
+      --background: #f8f9fb;
+      --foreground: #191c1e;
+
+      /* Core brand colors */
+      --primary: #ff0040;
+      --primary-foreground: #fff;
+
+      --secondary: #7757fa;
+      --secondary-foreground: #fff;
+
+      --tertiary: #7da5ff;
+      --tertiary-foreground: #fff;
+
+      /* Surfaces */
+      --surface: #ffffff;
+      --surface-foreground: var(--foreground);
+
+      --overlay: #ffffff;
+      --overlay-foreground: var(--foreground);
+
+      /* Supporting neutrals */
+      --muted: #6d7482;
+      --muted-foreground: #5b6370;
+
+      --default: #f2f4f6;
+      --default-foreground: var(--foreground);
+
+      --accent: var(--primary);
+      --accent-foreground: #fff;
+
+      /* Form fields */
+      --field-background: #f8f9fb;
+      --field-foreground: var(--foreground);
+      --field-placeholder: var(--muted);
+      --field-border: transparent;
+
+      /* Status colors */
+      --success: #7fd6b1;
+      --success-foreground: #fff;
+
+      --warning: #ffb4a6;
+      --warning-foreground: #fff;
+
+      --danger: #ff7a87;
+      --danger-foreground: #fff;
+
+      --segment: #eef1f5;
+      --segment-foreground: var(--foreground);
+
+      /* Borders and interactions */
+      --border: #e6e8ee;
+      --separator: #edf0f4;
+      --focus: var(--accent);
+      --link: var(--primary);
+
+      /* Shadows and glass tokens */
+      --surface-shadow:
+        0 14px 36px 0 rgba(91, 78, 140, 0.08), 0 4px 10px 0 rgba(255, 0, 64, 0.03);
+      --overlay-shadow:
+        0 18px 48px 0 rgba(91, 78, 140, 0.12), 0 4px 16px 0 rgba(30, 41, 59, 0.05);
+      --field-shadow:
+        0 0 0 0 transparent;
+
+      --home-glass-surface: rgba(255, 255, 255, 0.72);
+      --home-glass-border: rgba(255, 255, 255, 0.78);
+      --home-orb-pink: rgba(255, 127, 165, 0.26);
+      --home-orb-purple: rgba(119, 87, 250, 0.22);
+      --home-orb-blue: rgba(125, 165, 255, 0.22);
+      --home-progress-start: #9be7c7;
+      --home-progress-end: #4fbd92;
+      --home-review: #ff9d97;
+      --home-mastered: #7fd6b1;
+    }
+
+    @variant dark {
+      /* Luminous Learning - Dark companion theme */
+      --background: #0d1118;
+      --foreground: #f4f6fa;
+
+      --primary: #ff5b7e;
+      --primary-foreground: #ffffff;
+
+      --secondary: #9f8bff;
+      --secondary-foreground: #ffffff;
+
+      --tertiary: #8fb8ff;
+      --tertiary-foreground: #09111f;
+
+      --surface: #151a23;
+      --surface-foreground: var(--foreground);
+
+      --overlay: #1a2130;
+      --overlay-foreground: var(--foreground);
+
+      --muted: #98a1b2;
+      --muted-foreground: #8b95a8;
+
+      --default: #111722;
+      --default-foreground: var(--foreground);
+
+      --accent: var(--primary);
+      --accent-foreground: #ffffff;
+
+      --field-background: #121925;
+      --field-foreground: var(--foreground);
+      --field-placeholder: var(--muted);
+      --field-border: transparent;
+
+      --success: #7fd6b1;
+      --success-foreground: #09111f;
+
+      --warning: #ffb0a6;
+      --warning-foreground: #09111f;
+
+      --danger: #ff7a87;
+      --danger-foreground: #09111f;
+
+      --segment: #1c2330;
+      --segment-foreground: var(--foreground);
+
+      --border: #283242;
+      --separator: #202b39;
+      --focus: var(--accent);
+      --link: var(--primary);
+
+      /* Shadows and glass tokens */
+      --surface-shadow: 0 0 0 0 transparent inset;
+      --overlay-shadow: 0 20px 48px 0 rgba(0, 0, 0, 0.34);
+      --field-shadow: 0 0 0 0 transparent inset;
+
+      --home-glass-surface: rgba(21, 26, 35, 0.78);
+      --home-glass-border: rgba(255, 255, 255, 0.08);
+      --home-orb-pink: rgba(255, 91, 126, 0.18);
+      --home-orb-purple: rgba(159, 139, 255, 0.16);
+      --home-orb-blue: rgba(143, 184, 255, 0.18);
+      --home-progress-start: #8ce0bb;
+      --home-progress-end: #49b285;
+      --home-review: #ff9d97;
+      --home-mastered: #7fd6b1;
+    }
+  }
+}
+
+@theme inline static {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  /* Golden Earth Colors */
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-tertiary: var(--tertiary);
+  --color-tertiary-foreground: var(--tertiary-foreground);
+
+  --color-surface: var(--surface);
+  --color-surface-foreground: var(--surface-foreground);
+  --color-surface-hover: color-mix(in oklab, var(--surface) 92%, var(--surface-foreground) 8%);
+
+  --color-overlay: var(--overlay);
+  --color-overlay-foreground: var(--overlay-foreground);
+
+  --color-muted: var(--muted);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-segment: var(--segment);
+  --color-segment-foreground: var(--segment-foreground);
+
+  --color-border: var(--border);
+  --color-separator: var(--separator);
+  --color-focus: var(--focus);
+  --color-link: var(--link);
+
+  --color-default: var(--default);
+  --color-default-foreground: var(--default-foreground);
+
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+
+  /* Home-specific design tokens */
+  --color-home-glass: var(--home-glass-surface);
+  --color-home-glass-border: var(--home-glass-border);
+  --color-home-orb-pink: var(--home-orb-pink);
+  --color-home-orb-purple: var(--home-orb-purple);
+  --color-home-orb-blue: var(--home-orb-blue);
+  --color-home-progress-start: var(--home-progress-start);
+  --color-home-progress-end: var(--home-progress-end);
+  --color-home-review: var(--home-review);
+  --color-home-mastered: var(--home-mastered);
+
+  /* Form Field Tokens */
+  --color-field: var(--field-background, var(--default));
+  --color-field-foreground: var(--field-foreground, var(--foreground));
+  --color-field-placeholder: var(--field-placeholder, var(--muted));
+  --color-field-border: var(--field-border, var(--border));
+  --radius-field: var(--field-radius, var(--radius-xl));
+  --border-width-field: var(--field-border-width, var(--border-width));
+
+  --shadow-surface: var(--surface-shadow);
+  --shadow-overlay: var(--overlay-shadow);
+  --shadow-field: var(--field-shadow);
+
+  /* Calculated Variables */
+
+  /* Colors */
+
+  /* --- background shades --- */
+  --color-background-secondary: color-mix(in oklab, var(--background) 96%, var(--foreground) 4%);
+  --color-background-tertiary: color-mix(in oklab, var(--background) 92%, var(--foreground) 8%);
+  --color-background-inverse: var(--foreground);
+
+  /* ------------------------- */
+  --color-default-hover: color-mix(in oklab, var(--default) 96%, var(--default-foreground) 4%);
+  --color-accent-hover: color-mix(in oklab, var(--accent) 90%, var(--accent-foreground) 10%);
+  --color-success-hover: color-mix(in oklab, var(--success) 90%, var(--success-foreground) 10%);
+  --color-warning-hover: color-mix(in oklab, var(--warning) 90%, var(--warning-foreground) 10%);
+  --color-danger-hover: color-mix(in oklab, var(--danger) 90%, var(--danger-foreground) 10%);
+
+  /* Form Field Colors */
+  --color-field-hover: color-mix(in oklab, var(--field-background, var(--default)) 90%, var(--field-foreground, var(--foreground)) 2%);
+  --color-field-focus: var(--field-background, var(--default));
+  --color-field-border-hover: color-mix(in oklab, var(--field-border, var(--border)) 88%, var(--field-foreground, var(--foreground)) 10%);
+  --color-field-border-focus: color-mix(in oklab, var(--field-border, var(--border)) 74%, var(--field-foreground, var(--foreground)) 22%);
+
+  /* Soft Colors */
+  --color-accent-soft: color-mix(in oklab, var(--accent) 15%, transparent);
+  --color-accent-soft-foreground: var(--accent);
+  --color-accent-soft-hover: color-mix(in oklab, var(--accent) 20%, transparent);
+
+  --color-danger-soft: color-mix(in oklab, var(--danger) 15%, transparent);
+  --color-danger-soft-foreground: var(--danger);
+  --color-danger-soft-hover: color-mix(in oklab, var(--danger) 20%, transparent);
+
+  --color-warning-soft: color-mix(in oklab, var(--warning) 15%, transparent);
+  --color-warning-soft-foreground: var(--warning);
+  --color-warning-soft-hover: color-mix(in oklab, var(--warning) 20%, transparent);
+
+  --color-success-soft: color-mix(in oklab, var(--success) 15%, transparent);
+  --color-success-soft-foreground: var(--success);
+  --color-success-soft-hover: color-mix(in oklab, var(--success) 20%, transparent);
+
+  /* Surface Levels - progressively darker/lighter shades for layering */
+  --color-surface-secondary: color-mix(in oklab, var(--surface) 94%, var(--surface-foreground) 6%);
+  --color-surface-tertiary: color-mix(in oklab, var(--surface) 92%, var(--surface-foreground) 8%);
+
+  /* On Surface Colors */
+  --color-on-surface: color-mix(in oklab, var(--surface) 93%, var(--surface-foreground) 7%);
+  --color-on-surface-foreground: var(--surface-foreground);
+  --color-on-surface-hover: color-mix(in oklab, var(--surface) 91%, var(--surface-foreground) 9%);
+  --color-on-surface-focus: color-mix(in oklab, var(--surface) 93%, var(--surface-foreground) 7%);
+
+  /* On Surface Colors - Secondary (on secondary surface) */
+  --color-on-surface-secondary: color-mix(in oklab, var(--surface) 87%, var(--surface-foreground) 13%);
+  --color-on-surface-secondary-foreground: var(--surface-foreground);
+  --color-on-surface-secondary-hover: color-mix(in oklab, var(--surface) 85%, var(--surface-foreground) 15%);
+  --color-on-surface-secondary-focus: color-mix(in oklab, var(--surface) 87%, var(--surface-foreground) 13%);
+
+   /* On Surface Colors - Tertiary (on tertiary surface) */
+  --color-on-surface-tertiary: color-mix(in oklab, var(--surface) 85%, var(--surface-foreground) 15%);
+  --color-on-surface-tertiary-foreground: var(--surface-foreground);
+  --color-on-surface-tertiary-hover: color-mix(in oklab, var(--surface) 84%, var(--surface-foreground) 16%);
+  --color-on-surface-tertiary-focus: color-mix(in oklab, var(--surface) 85%, var(--surface-foreground) 15%);
+
+  /* Separator Colors - Levels */
+  --color-separator-secondary: color-mix(in oklab, var(--surface) 85%, var(--surface-foreground) 15%);
+  --color-separator-tertiary: color-mix(in oklab, var(--surface) 81%, var(--surface-foreground) 19%);
+
+  /* Border Colors - Levels (progressive contrast: default → secondary → tertiary) */
+  /* Light mode: lighter → darker | Dark mode: darker → lighter */
+  --color-border-secondary: color-mix(in oklab, var(--surface) 78%, var(--surface-foreground) 22%);
+  --color-border-tertiary: color-mix(in oklab, var(--surface) 66%, var(--surface-foreground) 34%);
+
+  /* Radius and default sizes - defaults can change by just changing the --radius */
+  --radius-xs: calc(var(--radius) * 0.25); /* 0.125rem (2px) */
+  --radius-sm: calc(var(--radius) * 0.5); /* 0.25rem (4px) */
+  --radius-md: calc(var(--radius) * 0.75); /* 0.375rem (6px) */
+  --radius-lg: calc(var(--radius) * 1); /* 0.5rem (8px) */
+  --radius-xl: calc(var(--radius) * 1.5); /* 0.75rem (12px) */
+  --radius-2xl: calc(var(--radius) * 2); /* 1rem (16px) */
+  --radius-3xl: calc(var(--radius) * 3); /* 1.5rem (24px) */
+  --radius-4xl: calc(var(--radius) * 4); /* 2rem (32px) */
+}
