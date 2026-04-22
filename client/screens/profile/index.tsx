@@ -516,6 +516,13 @@ export default function ProfileScreen() {
                       ? `Current target · ${currentStage.englishLabel}`
                       : 'Mind Garden complete'}
                 </Text>
+                <Text className="text-[12px] leading-[18px] mt-2" style={{ color: TOKENS.colors.mutedText }}>
+                  {resolvedSelectedStamp
+                    ? getStampRequirementCopy(resolvedSelectedStamp)
+                    : currentStage
+                      ? `Fill Learning Drop to ${DAILY_DROP_LIMIT}/${DAILY_DROP_LIMIT} on ${currentStage.targetDays} qualified day(s). Progress only increases on full-goal days.`
+                      : 'You have completed all four stages. Keep learning to maintain your rhythm.'}
+                </Text>
                 {resolvedSelectedStamp ? (
                   <Text className="text-[12px] leading-[16px] font-semibold mt-2" style={{ color: resolvedSelectedStamp.accentColor }}>
                     {getStampStatusCopy(resolvedSelectedStamp)}
