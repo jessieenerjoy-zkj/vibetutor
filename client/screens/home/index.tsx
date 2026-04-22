@@ -273,27 +273,39 @@ const getPosterQrRects = (x: number, y: number, size: number) => {
 
 const buildSharePosterSvg = (quote: string, author: string, dateLabel: string) => {
   const normalizedQuote = quote.replace(/^"+|"+$/g, '').trim();
-  const quoteLines = splitPosterLines(normalizedQuote, POSTER_TEXT_MAX_UNITS);
-  const quoteStartY = 180;
-  const quoteLineHeight = 108;
-  const quoteFontSize = 78;
+  const quoteLines = splitPosterLines(normalizedQuote, Math.max(16, POSTER_TEXT_MAX_UNITS - 6));
+  const dateParts = dateLabel.split('.');
+  const shortDateLabel = dateParts.length === 3
+    ? `${Number(dateParts[1])}/${Number(dateParts[2])}`
+    : dateLabel;
+
+  const cardX = 48;
+  const cardY = 48;
+  const cardWidth = POSTER_WIDTH - cardX * 2;
+
+  const headerY = 220;
+  const quoteMarkY = 356;
+  const quoteStartY = 500;
+  const quoteLineHeight = 94;
+  const quoteFontSize = 70;
   const quoteBlockHeight = quoteLines.length * quoteLineHeight;
-  const authorY = quoteStartY + quoteBlockHeight + 72;
-  const footerY = authorY + 94;
-  const footerHeight = 236;
-  const posterHeight = footerY + footerHeight + 64;
-  const footerWidth = POSTER_WIDTH - POSTER_SIDE_PADDING * 2;
-  const qrSize = 140;
-  const qrWrapSize = 164;
-  const qrWrapX = POSTER_WIDTH - POSTER_SIDE_PADDING - 28 - qrWrapSize;
-  const qrWrapY = footerY + 36;
+  const authorY = quoteStartY + quoteBlockHeight + 96;
+
+  const qrSize = 292;
+  const qrWrapSize = 340;
+  const qrWrapX = (POSTER_WIDTH - qrWrapSize) / 2;
+  const qrWrapY = authorY + 76;
   const qrX = qrWrapX + (qrWrapSize - qrSize) / 2;
   const qrY = qrWrapY + (qrWrapSize - qrSize) / 2;
+
+  const cardBottom = qrWrapY + qrWrapSize + 72;
+  const cardHeight = cardBottom - cardY;
+  const posterHeight = cardBottom + 52;
 
   const quoteLinesSvg = quoteLines
     .map((line, index) => {
       const y = quoteStartY + index * quoteLineHeight;
-      return `<text x="${POSTER_SIDE_PADDING}" y="${y}" fill="#2b1f25" font-family="PlusJakartaSans, Arial, sans-serif" font-size="${quoteFontSize}" font-weight="700">${escapeXml(line)}</text>`;
+      return `<text x="${cardX + 92}" y="${y}" fill="#20232b" font-family="PlusJakartaSans, Arial, sans-serif" font-size="${quoteFontSize}" font-weight="700">${escapeXml(line)}</text>`;
     })
     .join('');
 
@@ -303,24 +315,29 @@ const buildSharePosterSvg = (quote: string, author: string, dateLabel: string) =
 <svg xmlns="http://www.w3.org/2000/svg" width="${POSTER_WIDTH}" height="${posterHeight}" viewBox="0 0 ${POSTER_WIDTH} ${posterHeight}">
   <defs>
     <linearGradient id="posterBg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#f7f5f8" />
-      <stop offset="100%" stop-color="#f2eef3" />
+      <stop offset="0%" stop-color="#f9e8ef" />
+      <stop offset="100%" stop-color="#e8f0fb" />
     </linearGradient>
+    <radialGradient id="posterGlow" cx="50%" cy="96%" r="60%">
+      <stop offset="0%" stop-color="#cad8ef" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#cad8ef" stop-opacity="0" />
+    </radialGradient>
   </defs>
-  <rect x="0" y="0" width="${POSTER_WIDTH}" height="${posterHeight}" rx="56" fill="url(#posterBg)" />
+  <rect x="0" y="0" width="${POSTER_WIDTH}" height="${posterHeight}" fill="url(#posterBg)" />
+  <ellipse cx="${POSTER_WIDTH / 2}" cy="${posterHeight - 70}" rx="370" ry="95" fill="url(#posterGlow)" />
+
+  <rect x="${cardX}" y="${cardY}" width="${cardWidth}" height="${cardHeight}" rx="64" fill="#f8f8fb" stroke="#ffffff" stroke-opacity="0.82" stroke-width="2" />
+
+  <text x="${cardX + 92}" y="${headerY}" fill="#1f232a" font-family="PlusJakartaSans, Arial, sans-serif" font-size="68" font-weight="700">Daily Quote</text>
+  <text x="${cardX + cardWidth - 76}" y="${headerY}" text-anchor="end" fill="#5c40e6" font-family="PlusJakartaSans, Arial, sans-serif" font-size="68" font-weight="700">${escapeXml(shortDateLabel)}</text>
+
+  <text x="${cardX + 84}" y="${quoteMarkY}" fill="#f18cab" font-family="PlusJakartaSans, Arial, sans-serif" font-size="104" font-weight="700">”</text>
   ${quoteLinesSvg}
-  <text x="${POSTER_SIDE_PADDING}" y="${authorY}" fill="#7f615a" font-family="PlusJakartaSans, Arial, sans-serif" font-size="46" font-weight="600" letter-spacing="7">- ${escapeXml(author.toUpperCase())}</text>
 
-  <rect x="${POSTER_SIDE_PADDING}" y="${footerY}" width="${footerWidth}" height="${footerHeight}" rx="40" fill="#fff3f7" stroke="#ffd8e7" stroke-width="3" />
-  <circle cx="${POSTER_WIDTH - POSTER_SIDE_PADDING - 78}" cy="${footerY + 44}" r="58" fill="rgba(255, 10, 71, 0.12)" />
+  <rect x="${cardX + 92}" y="${authorY - 20}" width="74" height="5" rx="2.5" fill="#ff0a47" />
+  <text x="${cardX + 186}" y="${authorY}" fill="#333841" font-family="PlusJakartaSans, Arial, sans-serif" font-size="52" font-weight="500">${escapeXml(author)}</text>
 
-  <text x="${POSTER_SIDE_PADDING + 34}" y="${footerY + 82}" fill="#ff0a47" font-family="PlusJakartaSans, Arial, sans-serif" font-size="34" font-weight="700">VibeTutor Daily Spark</text>
-  <text x="${POSTER_SIDE_PADDING + 34}" y="${footerY + 130}" fill="#6f6167" font-family="PlusJakartaSans, Arial, sans-serif" font-size="31" font-weight="500">Keep your momentum one drop at a time.</text>
-
-  <rect x="${POSTER_SIDE_PADDING + 34}" y="${footerY + 154}" width="230" height="56" rx="28" fill="#ffe3ec" />
-  <text x="${POSTER_SIDE_PADDING + 58}" y="${footerY + 191}" fill="#be1d4f" font-family="PlusJakartaSans, Arial, sans-serif" font-size="28" font-weight="700">${escapeXml(dateLabel)}</text>
-
-  <rect x="${qrWrapX}" y="${qrWrapY}" width="${qrWrapSize}" height="${qrWrapSize}" rx="24" fill="#ffffff" stroke="#f6d3df" stroke-width="2" />
+  <rect x="${qrWrapX}" y="${qrWrapY}" width="${qrWrapSize}" height="${qrWrapSize}" rx="18" fill="#ffffff" />
   ${qrRects}
 </svg>
 `.trim();
@@ -1185,47 +1202,52 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15, 10, 18, 0.58)',
   },
   posterSheet: {
-    backgroundColor: '#fff6fa',
-    borderColor: '#f4dce7',
-    borderRadius: 28,
-    borderWidth: 1,
+    backgroundColor: '#f7f4f8',
+    borderColor: '#efe5ef',
+    borderRadius: 32,
+    borderWidth: 1.2,
     maxHeight: '90%',
     overflow: 'hidden',
     width: '100%',
+    shadowColor: '#8f8396',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.16,
+    shadowRadius: 26,
+    elevation: 8,
   },
   posterViewport: {
     maxHeight: 520,
   },
   posterViewportContent: {
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    paddingBottom: 8,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 12,
   },
   posterCanvasWrap: {
-    borderRadius: 20,
+    borderRadius: 24,
     overflow: 'hidden',
     width: '100%',
   },
   posterActions: {
-    borderTopColor: '#f2d7e3',
+    borderTopColor: '#ebe2eb',
     borderTopWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
   },
   posterActionButton: {
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderColor: '#efd6e1',
-    borderRadius: 16,
+    backgroundColor: '#fcfbfd',
+    borderColor: '#e9e2ea',
+    borderRadius: 18,
     borderWidth: 1,
     flex: 1,
     flexDirection: 'row',
     gap: 8,
     justifyContent: 'center',
     marginHorizontal: 4,
-    minHeight: 46,
+    minHeight: 50,
   },
   posterActionText: {
     color: UI.text,
