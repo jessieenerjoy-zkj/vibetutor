@@ -1,19 +1,23 @@
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
   ScrollView,
+  Modal,
   Keyboard,
   Platform,
   Image,
   Alert,
   ActivityIndicator,
-  Modal,
-  Share,
-  AppState,
+  FlatList,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
+  useWindowDimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Audio } from 'expo-av';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -22,143 +26,61 @@ import Animated, {
   withDelay,
   withTiming,
 } from 'react-native-reanimated';
-import Svg, { Circle } from 'react-native-svg';
-import Toast from 'react-native-toast-message';
 import { Screen } from '@/components/Screen';
-import { useSafeRouter, useSafeSearchParams } from '@/hooks/useSafeRouter';
 import { FontAwesome6 } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
-import { ConfettiCelebration } from '@/components/ConfettiCelebration';
+import { Base64 } from 'js-base64';
+import { buildApiUrl } from '@/utils/api';
 import {
   TutorPersona,
+  TtsVoice,
   PERSONA_CONFIG,
+  TUTOR_PERSONAS,
   ChatMessage,
-  MoodType,
 } from '@/utils/types';
-import { DAILY_DROP_LIMIT } from '@/utils/learning';
 import {
   getCurrentPersona,
+  getPersonaVoicePreferences,
   saveCurrentPersona,
   getChatHistory,
   saveChatHistory,
   addDrop,
   getTodayDrops,
-  getTodayMood,
-  shouldTutorAutoGreet,
-  saveTutorGreetingState,
-  trackLocalEvent,
-  extractSubjectTag,
-  recordTutorSolvedSubject,
-  getTodayStudyReportData,
-  recordTutorFocusDuration,
-  type DropUpdateResult,
-  type SubjectBreakdown,
-  type TodayStudyReportData,
+  clearChatHistory,
+  subscribeToDataReset,
 } from '@/utils/storage';
 
-const PERSONAS: TutorPersona[] = ['Gentle', 'Gordon', 'Trump', 'WiseElder', 'Neutral'];
-const resolveBackendBaseUrl = () => {
-  const configured = process.env.EXPO_PUBLIC_BACKEND_BASE_URL?.replace(/\/$/, '');
-
-  if (configured) {
-    return configured;
-  }
-
-  if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    const { protocol, hostname } = window.location;
-    return `${protocol}//${hostname}:9091`;
-  }
-
-  return 'http://127.0.0.1:9091';
-};
-
-const BACKEND_BASE_URL = resolveBackendBaseUrl();
-
-const MIN_IMAGE_BASE64_LENGTH = 1000;
-
-const FINISH_LEARNING_EMPTY_TOAST = "You haven't solved any problems yet today. Let's get started!";
-const FOCUS_TICK_SECONDS = 10;
-
-const REPORT_SUBJECT_LABELS: Array<{ key: keyof SubjectBreakdown; label: string }> = [
-  { key: 'Math', label: 'Math' },
-  { key: 'Physics', label: 'Physics' },
-  { key: 'Chemistry', label: 'Chemistry' },
-  { key: 'History', label: 'History' },
-  { key: 'Other', label: 'Other' },
-];
-
-const REPORT_SUBJECT_COLORS: Record<keyof SubjectBreakdown, string> = {
-  Math: '#FF0040',
-  Physics: '#7C3AED',
-  Chemistry: '#F59E0B',
-  History: '#16A4E0',
-  Other: '#94A3B8',
-};
-
-const REPORT_DONUT_SIZE = 184;
-const REPORT_DONUT_STROKE_WIDTH = 24;
-const REPORT_DONUT_RADIUS = (REPORT_DONUT_SIZE - REPORT_DONUT_STROKE_WIDTH) / 2;
-const REPORT_DONUT_CIRCUMFERENCE = 2 * Math.PI * REPORT_DONUT_RADIUS;
-
-const PERSONA_MOOD_GREETINGS: Record<MoodType, Record<TutorPersona, string>> = {
-  Crushed: {
-    Gordon: "*Sigh.* You look like you've been through it. Fine, I'll go easy... for now. Show me the problem.",
-    Gentle: "Hey, it's okay. You don't have to be perfect. Let's just take one small step together. What's on your mind?",
-    Trump: "A bad day? Believe me, I've seen worse. But we're going to turn it around - hugely. Give me your toughest problem!",
-    WiseElder: 'Ah, my child. When the heart is heavy, even a simple question feels like a mountain. Sit with me. Tell me where it hurts.',
-    Neutral: "I notice you're feeling overwhelmed. That's okay. Please share the problem you're working on, and we'll go step by step.",
-  },
-  Stuck: {
-    Gordon: "Stuck? Seriously? Okay, let's unstick you. Show me where you froze - and don't give me that blank look.",
-    Gentle: "Being stuck just means you're about to learn something new. Let's look at it together. Where did you get lost?",
-    Trump: "Stuck? That's unacceptable - we're going to fix it fast. Nobody gets unstuck like me. What's the problem?",
-    WiseElder: "Ah, stuck. That's a good place. It means you've tried. Let me tell you a short story about a key and a lock... then we'll look at your problem.",
-    Neutral: "You're stuck on a problem. That's common. Please paste or describe the problem, and I'll help you identify the first point of confusion.",
-  },
-  Calm: {
-    Gordon: "Calm, huh? Good. Let's keep you on your toes. Throw me a problem - I'll make sure you don't fall asleep.",
-    Gentle: "A calm mind learns best. I'm glad you're here. What would you like to work on today?",
-    Trump: "Calm is nice, but winning is better. I'll give you the best explanations, believe me. Send your problem.",
-    WiseElder: "Peaceful. That's when the mind listens. What question shall we gently unfold today, child?",
-    Neutral: "You're in a stable state. Let's proceed efficiently. Please share the problem you want to solve.",
-  },
-  Engaged: {
-    Gordon: "Finally, someone with focus! Let's go. Give me a problem - I won't go easy on you. Ready?",
-    Gentle: "Love your energy! You're really focused. Let's channel that into solving something great. What's the challenge?",
-    Trump: "Engaged? Tremendous. That's the spirit of a winner. I will give you the best tutoring you've ever had. Ask me anything.",
-    WiseElder: 'Ah, the fire of focus. I see it in your eyes. Then let us not waste it. Present your question, and we shall reason together.',
-    Neutral: "You appear highly focused. That's optimal for learning. Please provide the problem, and I will give a structured solution.",
-  },
-  Hyper: {
-    Gordon: "Whoa, too much caffeine? Calm down a notch. But since you're hyped, let's burn that energy on a hard problem. Go!",
-    Gentle: "You're full of energy today! That's great, but let's take a deep breath and focus it. Show me a problem - we'll solve it fast.",
-    Trump: "Hyper energy? I love it. That's winning energy. But let's make it smart energy. Give me a problem - we'll crush it. Huge.",
-    WiseElder: "Eager, aren't we? Slow down just a little, my child. A racing horse stumbles. Breathe, then tell me what you want to learn.",
-    Neutral: "High energy detected. That's fine. Let's focus it on problem-solving. Please present your question, and I'll respond clearly and directly.",
-  },
-};
-
+// 动态加载动画组件 - 三个点依次闪烁
 const AnimatedDots = () => {
   const opacity1 = useSharedValue(0.3);
   const opacity2 = useSharedValue(0.3);
   const opacity3 = useSharedValue(0.3);
 
   opacity1.value = withRepeat(
-    withSequence(withDelay(0, withTiming(1, { duration: 400 })), withTiming(0.3, { duration: 400 })),
+    withSequence(
+      withDelay(0, withTiming(1, { duration: 400 })),
+      withTiming(0.3, { duration: 400 })
+    ),
     -1,
     false
   );
 
   opacity2.value = withRepeat(
-    withSequence(withDelay(150, withTiming(1, { duration: 400 })), withTiming(0.3, { duration: 400 })),
+    withSequence(
+      withDelay(150, withTiming(1, { duration: 400 })),
+      withTiming(0.3, { duration: 400 })
+    ),
     -1,
     false
   );
 
   opacity3.value = withRepeat(
-    withSequence(withDelay(300, withTiming(1, { duration: 400 })), withTiming(0.3, { duration: 400 })),
+    withSequence(
+      withDelay(300, withTiming(1, { duration: 400 })),
+      withTiming(0.3, { duration: 400 })
+    ),
     -1,
     false
   );
@@ -169,92 +91,93 @@ const AnimatedDots = () => {
 
   return (
     <View className="flex-row items-center gap-1.5">
-      <Animated.View className="w-1.5 h-1.5 rounded-full bg-[var(--color-muted)]" style={style1} />
-      <Animated.View className="w-1.5 h-1.5 rounded-full bg-[var(--color-muted)]" style={style2} />
-      <Animated.View className="w-1.5 h-1.5 rounded-full bg-[var(--color-muted)]" style={style3} />
+      <Animated.View
+        className="w-1.5 h-1.5 rounded-full bg-[var(--color-muted)]"
+        style={style1}
+      />
+      <Animated.View
+        className="w-1.5 h-1.5 rounded-full bg-[var(--color-muted)]"
+        style={style2}
+      />
+      <Animated.View
+        className="w-1.5 h-1.5 rounded-full bg-[var(--color-muted)]"
+        style={style3}
+      />
     </View>
   );
 };
 
-const getWelcomeMessage = (persona: TutorPersona, mood: MoodType): ChatMessage => ({
-  id: Date.now().toString(),
-  role: 'assistant',
-  content: PERSONA_MOOD_GREETINGS[mood][persona],
-  persona,
-  timestamp: new Date(),
-});
+const getWelcomeMessage = (persona: TutorPersona): ChatMessage => {
+  const welcomes: Record<TutorPersona, string> = {
+    Oprah: 'Welcome, my friend. If you are overwhelmed, tired, or doubting yourself, that is okay. We will take this one gentle step at a time and build your confidence as we go.',
+    Einstein: 'Welcome. Let us slow the noise, return to first principles, and understand the deep structure of the problem so the answer becomes inevitable.',
+    Trump: 'Welcome, champion. You came to the right place, believe me. We are going to attack this problem with tremendous energy, brilliant strategy, and a winning style that feels absolutely fantastic.',
+    Elon: 'Problem-solving mode activated. Send the goal, the constraint, or the bottleneck. We will cut the noise, isolate the critical path, and get to the result fast.',
+    Sherlock: 'Welcome. Every difficult problem leaves traces. Bring me the facts, the pattern, and the point of confusion, and we shall uncover the decisive clue together.',
+  };
+  return {
+    id: Date.now().toString(),
+    role: 'assistant',
+    content: welcomes[persona],
+    timestamp: new Date(),
+  };
+};
+
+const normalizeStyleCommand = (value: string): string => {
+  return value.replace(/[\s【】!！?？,，.。~～、:：;；'"“”‘’（）()\-]/g, '');
+};
+
+const PERSONA_SPEECH_RATE: Record<TutorPersona, number> = {
+  Oprah: 0.9,
+  Einstein: 0.8,
+  Trump: 1.16,
+  Elon: 1.25,
+  Sherlock: 1.05,
+};
+
+const PERSONA_AVATARS: Record<TutorPersona, number> = {
+  Oprah: require('@/assets/images/personas/oprah.png'),
+  Einstein: require('@/assets/images/personas/einstein.png'),
+  Trump: require('@/assets/images/personas/trump.png'),
+  Elon: require('@/assets/images/personas/elon.png'),
+  Sherlock: require('@/assets/images/personas/sherlock.png'),
+};
 
 export default function TutorScreen() {
-  const router = useSafeRouter();
   const scrollViewRef = useRef<ScrollView>(null);
-  const personaScrollRef = useRef<ScrollView>(null);
-  const launchHandledRef = useRef<string | null>(null);
-  const reportLaunchHandledRef = useRef<string | null>(null);
-  const params = useSafeSearchParams<{
-    entrySource?: string;
-    persona?: TutorPersona;
-    mood?: MoodType;
-    autoGreeting?: boolean;
-    launchToken?: number;
-    openReport?: boolean;
-    reportLaunchToken?: number;
-  }>();
-  const [currentPersona, setCurrentPersona] = useState<TutorPersona>('Neutral');
+  const styleListRef = useRef<FlatList<TutorPersona>>(null);
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const webAudioUrlRef = useRef<string | null>(null);
+  const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
+  const [currentPersona, setCurrentPersona] = useState<TutorPersona>('Einstein');
+  const [selectedStylePersona, setSelectedStylePersona] = useState<TutorPersona>('Einstein');
+  const [isStylePickerVisible, setIsStylePickerVisible] = useState(false);
+  const [isProfileExpanded, setIsProfileExpanded] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [selectedImageBase64, setSelectedImageBase64] = useState<string | null>(null);
   const [recognizedText, setRecognizedText] = useState<string | null>(null);
   const [isRecognizing, setIsRecognizing] = useState(false);
   const [todayDrops, setTodayDrops] = useState(0);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
-  const [todayMood, setTodayMood] = useState<MoodType>('Calm');
-  const [celebration, setCelebration] = useState<DropUpdateResult['unlockedStamp']>(null);
-  const [showFinishModal, setShowFinishModal] = useState(false);
-  const [showReportCard, setShowReportCard] = useState(false);
-  const [reportData, setReportData] = useState<TodayStudyReportData | null>(null);
-  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [playingMessageId, setPlayingMessageId] = useState<string | null>(null);
+  const [isVoiceEnabled, setIsVoiceEnabled] = useState(true);
+  const [personaVoicePreferences, setPersonaVoicePreferences] = useState<Partial<Record<TutorPersona, TtsVoice>>>({});
+  const latestAssistantMessageIdRef = useRef<string | null>(null);
+  const lastAutoWelcomedKeyRef = useRef<string | null>(null);
+  const previewPersona = PERSONA_CONFIG[selectedStylePersona];
+  const persona = PERSONA_CONFIG[currentPersona];
+  const styleCardWidth = Math.max(screenWidth - 56, 280);
 
-  const legacyGreetingTexts = useRef(['嘿，亲爱的。今天感觉怎么样?我在这里陪着你，慢慢来，不着急哦~']);
-  const focusIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const scrollToBottom = () => {
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 100);
-  };
-
-  const pushGreetingMessage = useCallback(
-    async (persona: TutorPersona, mood: MoodType, baseMessages: ChatMessage[]) => {
-      const nextMessages = [
-        ...baseMessages,
-        {
-          id: `${Date.now()}-divider-${persona}`,
-          role: 'system' as const,
-          content: `Switched to ${PERSONA_CONFIG[persona].label}`,
-          persona,
-          timestamp: new Date(),
-        },
-        {
-          ...getWelcomeMessage(persona, mood),
-          id: `${Date.now()}-${persona}`,
-        },
-      ];
-
-      setMessages(nextMessages);
-      await saveChatHistory(nextMessages);
-      await saveTutorGreetingState(persona);
-      scrollToBottom();
-    },
-    []
-  );
-
+  // 监听键盘事件
   useEffect(() => {
     const showListener = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      (event) => {
-        setKeyboardHeight(event.endCoordinates.height);
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+        // 键盘弹出时自动滚动到底部
         setTimeout(() => scrollToBottom(), 100);
       }
     );
@@ -271,33 +194,28 @@ export default function TutorScreen() {
     };
   }, []);
 
+  // 加载数据
   const loadData = useCallback(async () => {
-    const [persona, mood, history, drops] = await Promise.all([
-      getCurrentPersona(),
-      getTodayMood(),
-      getChatHistory(),
-      getTodayDrops(),
-    ]);
-    const sanitizedHistory = history.filter(
-      (message) => !legacyGreetingTexts.current.includes(message.content)
-    );
-
+    const persona = await getCurrentPersona();
+    const history = await getChatHistory();
+    const drops = await getTodayDrops();
+    const voicePreferences = await getPersonaVoicePreferences();
     setCurrentPersona(persona);
-    setTodayMood(mood || 'Calm');
-    setMessages(sanitizedHistory);
+    setMessages(history);
     setTodayDrops(drops);
-    if (sanitizedHistory.length !== history.length) {
-      await saveChatHistory(sanitizedHistory);
-    }
-
-    if (sanitizedHistory.length === 0) {
-      const welcomeMessage = getWelcomeMessage(persona, mood || 'Calm');
-      const nextMessages = [welcomeMessage];
-      setMessages(nextMessages);
-      await saveChatHistory(nextMessages);
-      await saveTutorGreetingState(persona);
+    setPersonaVoicePreferences(voicePreferences);
+    
+    if (history.length === 0) {
+      const welcomeMsg = getWelcomeMessage(persona);
+      setMessages([welcomeMsg]);
     }
   }, []);
+
+  useEffect(() => {
+    return subscribeToDataReset(() => {
+      void loadData();
+    });
+  }, [loadData]);
 
   useFocusEffect(
     useCallback(() => {
@@ -305,213 +223,318 @@ export default function TutorScreen() {
     }, [loadData])
   );
 
-  useFocusEffect(
-    useCallback(() => {
-      const appStateSubscription = AppState.addEventListener('change', (state) => {
-        const canStartOnWeb =
-          Platform.OS !== 'web' || typeof document === 'undefined' || document.visibilityState === 'visible';
+  useEffect(() => {
+    if (!isStylePickerVisible) {
+      return;
+    }
 
-        if (state === 'active' && canStartOnWeb) {
-          if (!focusIntervalRef.current) {
-            focusIntervalRef.current = setInterval(() => {
-              void recordTutorFocusDuration(FOCUS_TICK_SECONDS);
-            }, FOCUS_TICK_SECONDS * 1000);
-          }
-        } else if (focusIntervalRef.current) {
-          clearInterval(focusIntervalRef.current);
-          focusIntervalRef.current = null;
-        }
+    const selectedIndex = TUTOR_PERSONAS.indexOf(selectedStylePersona);
+    const timer = setTimeout(() => {
+      styleListRef.current?.scrollToIndex({
+        index: Math.max(selectedIndex, 0),
+        animated: false,
       });
+    }, 0);
 
-      const canStartImmediately =
-        AppState.currentState === 'active' &&
-        (Platform.OS !== 'web' || typeof document === 'undefined' || document.visibilityState === 'visible');
+    return () => clearTimeout(timer);
+  }, [isStylePickerVisible, selectedStylePersona]);
 
-      if (canStartImmediately && !focusIntervalRef.current) {
-        focusIntervalRef.current = setInterval(() => {
-          void recordTutorFocusDuration(FOCUS_TICK_SECONDS);
-        }, FOCUS_TICK_SECONDS * 1000);
-      }
+  const stopPlayback = useCallback(async () => {
+    if (soundRef.current) {
+      await soundRef.current.unloadAsync();
+      soundRef.current = null;
+    }
 
-      const visibilityCleanup =
-        Platform.OS === 'web' && typeof document !== 'undefined'
-          ? (() => {
-              const onVisibilityChange = () => {
-                if (document.visibilityState === 'visible') {
-                  if (!focusIntervalRef.current) {
-                    focusIntervalRef.current = setInterval(() => {
-                      void recordTutorFocusDuration(FOCUS_TICK_SECONDS);
-                    }, FOCUS_TICK_SECONDS * 1000);
-                  }
-                } else if (focusIntervalRef.current) {
-                  clearInterval(focusIntervalRef.current);
-                  focusIntervalRef.current = null;
-                }
-              };
+    if (webAudioUrlRef.current) {
+      URL.revokeObjectURL(webAudioUrlRef.current);
+      webAudioUrlRef.current = null;
+    }
 
-              document.addEventListener('visibilitychange', onVisibilityChange);
-              onVisibilityChange();
-
-              return () => {
-                document.removeEventListener('visibilitychange', onVisibilityChange);
-              };
-            })()
-          : null;
-
-      return () => {
-        appStateSubscription.remove();
-        if (visibilityCleanup) {
-          visibilityCleanup();
-        }
-        if (focusIntervalRef.current) {
-          clearInterval(focusIntervalRef.current);
-          focusIntervalRef.current = null;
-        }
-      };
-    }, [])
-  );
+    setPlayingMessageId(null);
+  }, []);
 
   useEffect(() => {
-    if (!params.persona || !params.autoGreeting) {
-      return;
-    }
+    return () => {
+      void stopPlayback();
+    };
+  }, [stopPlayback]);
 
-    const launchKey = `${params.persona}-${params.launchToken || 'default'}`;
-    if (launchHandledRef.current === launchKey) {
-      return;
-    }
-
-    launchHandledRef.current = launchKey;
-
-    const targetPersona = params.persona;
-    void (async () => {
-      const mood = params.mood || (await getTodayMood()) || 'Calm';
-      await saveCurrentPersona(targetPersona);
-      setCurrentPersona(targetPersona);
-      setTodayMood(mood);
-
-      setTimeout(() => {
-        const personaIndex = PERSONAS.indexOf(targetPersona);
-        if (personaIndex >= 0) {
-          personaScrollRef.current?.scrollTo({
-            x: Math.max(0, personaIndex * 110 - 24),
-            animated: true,
-          });
-        }
-      }, 80);
-
-      const history = await getChatHistory();
-      const shouldGreet = await shouldTutorAutoGreet(targetPersona);
-      if (!shouldGreet) {
-        setMessages(history);
-        return;
-      }
-
-      await pushGreetingMessage(targetPersona, mood, history);
-    })();
-  }, [params.autoGreeting, params.launchToken, params.persona, pushGreetingMessage]);
-
-  const handlePersonaChange = async (persona: TutorPersona) => {
-    if (persona === currentPersona) return;
-
-    await saveCurrentPersona(persona);
-    setCurrentPersona(persona);
-
+  const scrollToBottom = () => {
     setTimeout(() => {
-      const personaIndex = PERSONAS.indexOf(persona);
-      if (personaIndex >= 0) {
-        personaScrollRef.current?.scrollTo({
-          x: Math.max(0, personaIndex * 110 - 24),
-          animated: true,
-        });
-      }
-    }, 80);
-
-    await pushGreetingMessage(persona, todayMood, messages);
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
   };
 
-  const readImageAsBase64 = async (imageUri: string): Promise<string> => {
+  const readImageAsBase64 = useCallback(async (imageUri: string): Promise<string> => {
+    const dataUriMatch = imageUri.match(/^data:image\/[a-zA-Z0-9.+-]+;base64,(.+)$/);
+    if (dataUriMatch?.[1]) {
+      return dataUriMatch[1].replace(/\s+/g, '');
+    }
+
     if (Platform.OS === 'web') {
       const response = await fetch(imageUri);
-      const blob = await response.blob();
+      if (!response.ok) {
+        throw new Error(`Failed to load image: ${response.status}`);
+      }
 
-      return await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          if (typeof reader.result !== 'string') {
-            reject(new Error('Web image read failed: invalid FileReader result'));
-            return;
-          }
-
-          const base64 = reader.result.split(',')[1] || '';
-          if (!base64) {
-            reject(new Error('Web image read failed: empty base64 payload'));
-            return;
-          }
-
-          resolve(base64);
-        };
-        reader.onerror = () => reject(new Error('Web image read failed: FileReader error'));
-        reader.readAsDataURL(blob);
-      });
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      return Base64.fromUint8Array(bytes);
     }
 
     return await (FileSystem as any).readAsStringAsync(imageUri, {
       encoding: 'base64',
     });
-  };
+  }, []);
 
-  const readWebFileAsBase64 = async (file: File): Promise<string> => {
-    return await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result !== 'string') {
-          reject(new Error('Web file read failed: invalid FileReader result'));
-          return;
-        }
+  const openStylePicker = useCallback(() => {
+    setSelectedStylePersona(currentPersona);
+    setIsStylePickerVisible(true);
+  }, [currentPersona]);
 
-        const base64 = reader.result.split(',')[1] || '';
-        if (!base64) {
-          reject(new Error('Web file read failed: empty base64 payload'));
-          return;
-        }
+  const updateStyleByOffset = useCallback((offsetX: number) => {
+    if (!Number.isFinite(offsetX) || screenWidth <= 0) {
+      return;
+    }
 
-        resolve(base64);
-      };
-      reader.onerror = () => reject(new Error('Web file read failed: FileReader error'));
-      reader.readAsDataURL(file);
-    });
-  };
+    const nextIndex = Math.round(offsetX / screenWidth);
+    const clampedIndex = Math.max(0, Math.min(TUTOR_PERSONAS.length - 1, nextIndex));
+    const nextPersona = TUTOR_PERSONAS[clampedIndex];
 
-  const getImageBase64FromAsset = async (asset: ImagePicker.ImagePickerAsset): Promise<string> => {
+    if (nextPersona && nextPersona !== selectedStylePersona) {
+      setSelectedStylePersona(nextPersona);
+    }
+  }, [screenWidth, selectedStylePersona]);
+
+  const handleStyleScrollEnd = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      updateStyleByOffset(event.nativeEvent.contentOffset.x);
+    },
+    [updateStyleByOffset]
+  );
+
+  const handleClearConversation = useCallback(() => {
+    Alert.alert(
+      '清空当前对话',
+      '会清除 AI Tutor 的历史消息，并恢复到默认开场白。',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '清空',
+          style: 'destructive',
+          onPress: async () => {
+            await clearChatHistory();
+            await loadData();
+          },
+        },
+      ]
+    );
+  }, [loadData]);
+
+  const createAudioUriFromResponse = useCallback(async (response: Response) => {
     if (Platform.OS === 'web') {
-      const webAsset = asset as ImagePicker.ImagePickerAsset & { file?: File };
-
-      if (webAsset.file) {
-        return await readWebFileAsBase64(webAsset.file);
-      }
-
-      if (asset.uri.startsWith('data:image/')) {
-        const payload = asset.uri.split(',')[1] || '';
-        if (payload) return payload;
-      }
+      const blob = await response.blob();
+      const audioUrl = URL.createObjectURL(blob);
+      webAudioUrlRef.current = audioUrl;
+      return audioUrl;
     }
 
-    if (asset.base64 && asset.base64.length >= MIN_IMAGE_BASE64_LENGTH) {
-      return asset.base64;
+    const cacheDirectory = (FileSystem as any).cacheDirectory;
+    if (!cacheDirectory) {
+      throw new Error('No cache directory available');
     }
 
-    return await readImageAsBase64(asset.uri);
-  };
+    const audioBase64 = Base64.fromUint8Array(new Uint8Array(await response.arrayBuffer()));
+    const audioUri = `${cacheDirectory}tts-${Date.now()}.wav`;
+    await (FileSystem as any).writeAsStringAsync(audioUri, audioBase64, {
+      encoding: 'base64',
+    });
+    return audioUri;
+  }, []);
 
-  const recognizeImageText = async (imageBase64: string): Promise<string | null> => {
+  const getTtsErrorMessage = useCallback((rawError: string) => {
+    const normalized = rawError.trim();
+
+    if (!normalized) {
+      return '未收到后端错误详情，请检查 server 日志。';
+    }
+
+    try {
+      const parsed = JSON.parse(normalized);
+      const detail = parsed?.detail;
+      const error = parsed?.error;
+
+      if (typeof detail === 'string' && detail.trim()) {
+        return detail.trim().slice(0, 180);
+      }
+
+      if (typeof error === 'string' && error.trim()) {
+        return error.trim().slice(0, 180);
+      }
+    } catch {
+      // Fall through to string heuristics.
+    }
+
+    if (normalized.includes('Missing OPENROUTER_API_KEY')) {
+      return '服务端缺少 OPENROUTER_API_KEY。';
+    }
+
+    if (normalized.includes('No audio data returned')) {
+      return 'OpenRouter 已返回成功，但没有生成音频数据。';
+    }
+
+    if (normalized.includes('fetch failed') || normalized.includes('timeout')) {
+      return '连接 OpenRouter TTS 超时，请稍后重试。';
+    }
+
+    return normalized.slice(0, 180);
+  }, []);
+
+  const handlePlayMessage = useCallback(async (message: ChatMessage, options?: { isAuto?: boolean; persona?: TutorPersona }) => {
+    const isAuto = options?.isAuto ?? false;
+    const targetPersona = options?.persona ?? currentPersona;
+
+    if (message.role !== 'assistant') {
+      return;
+    }
+
+    if (isAuto && latestAssistantMessageIdRef.current !== message.id) {
+      return;
+    }
+
+    if (playingMessageId === message.id) {
+      await stopPlayback();
+      return;
+    }
+
+    try {
+      await stopPlayback();
+      setPlayingMessageId(message.id);
+
+      const response = await fetch(
+        buildApiUrl('/api/v1/tts'),
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: message.content,
+            persona: targetPersona,
+            voice: personaVoicePreferences[targetPersona] ?? null,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(getTtsErrorMessage(errorText));
+      }
+
+      if (isAuto && latestAssistantMessageIdRef.current !== message.id) {
+        await stopPlayback();
+        return;
+      }
+
+      const audioUri = await createAudioUriFromResponse(response);
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: audioUri },
+        {
+          shouldPlay: true,
+          rate: PERSONA_SPEECH_RATE[targetPersona],
+          shouldCorrectPitch: true,
+        }
+      );
+
+      soundRef.current = sound;
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          void stopPlayback();
+        }
+      });
+    } catch (error) {
+      console.error('TTS playback error:', error);
+      await stopPlayback();
+      const detail = error instanceof Error ? error.message : '未知错误';
+      Alert.alert('语音播放失败', detail);
+    }
+  }, [createAudioUriFromResponse, currentPersona, getTtsErrorMessage, personaVoicePreferences, playingMessageId, stopPlayback]);
+
+  useEffect(() => {
+    if (!isVoiceEnabled) {
+      void stopPlayback();
+    }
+  }, [isVoiceEnabled, stopPlayback]);
+
+  useEffect(() => {
+    if (!isVoiceEnabled || messages.length === 0) {
+      return;
+    }
+
+    const latestMessage = messages[messages.length - 1];
+    const expectedWelcome = getWelcomeMessage(currentPersona).content;
+    const isPersonaWelcome =
+      latestMessage.role === 'assistant' && latestMessage.content === expectedWelcome;
+
+    if (!isPersonaWelcome) {
+      return;
+    }
+
+    const welcomeKey = `${currentPersona}:${latestMessage.id}`;
+    if (lastAutoWelcomedKeyRef.current === welcomeKey) {
+      return;
+    }
+
+    lastAutoWelcomedKeyRef.current = welcomeKey;
+    latestAssistantMessageIdRef.current = latestMessage.id;
+    void handlePlayMessage(latestMessage, { isAuto: true, persona: currentPersona });
+  }, [currentPersona, handlePlayMessage, isVoiceEnabled, messages]);
+
+  const handleApplyStyle = useCallback(async () => {
+    const nextPersona = selectedStylePersona;
+    const nextWelcome = getWelcomeMessage(nextPersona);
+    const welcomeMessageSet = new Set(
+      TUTOR_PERSONAS.map((personaKey) => getWelcomeMessage(personaKey).content)
+    );
+
+    setCurrentPersona(nextPersona);
+    setIsProfileExpanded(false);
+    setIsStylePickerVisible(false);
+    await saveCurrentPersona(nextPersona);
+
+    setMessages((prev) => {
+      const filteredMessages = prev.filter(
+        (message) => !(message.role === 'assistant' && welcomeMessageSet.has(message.content))
+      );
+      const newMessages = [...filteredMessages, nextWelcome];
+      void saveChatHistory(newMessages);
+      return newMessages;
+    });
+
+    if (isVoiceEnabled) {
+      latestAssistantMessageIdRef.current = nextWelcome.id;
+      await handlePlayMessage(nextWelcome, { isAuto: true, persona: nextPersona });
+    }
+
+    scrollToBottom();
+  }, [handlePlayMessage, isVoiceEnabled, selectedStylePersona]);
+
+  // OCR识别图片文字
+  const recognizeImageText = async (imageUri: string): Promise<string | null> => {
     setIsRecognizing(true);
     try {
-      const response = await fetch(`${BACKEND_BASE_URL}/api/v1/ocr`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ imageBase64 }),
-      });
+      const base64 = await readImageAsBase64(imageUri);
+
+      /**
+       * 服务端文件：server/src/index.ts
+       * 接口：POST /api/v1/ocr
+       * Body 参数：imageBase64: string
+       */
+      const response = await fetch(
+        buildApiUrl('/api/v1/ocr'),
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageBase64: base64 }),
+        }
+      );
 
       if (response.ok) {
         const data = await response.json();
@@ -528,36 +551,29 @@ export default function TutorScreen() {
     }
   };
 
+  // 图片选择
   const handlePickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: false,
       quality: 0.6,
-      base64: true,
     });
 
     if (!result.canceled && result.assets[0]) {
-      const asset = result.assets[0];
-      const uri = asset.uri;
-      let base64 = '';
-      try {
-        base64 = await getImageBase64FromAsset(asset);
-      } catch (error) {
-        console.log('Failed to read picked image base64:', error);
-      }
-
+      const uri = result.assets[0].uri;
       setSelectedImage(uri);
-      setSelectedImageBase64(base64 || null);
       setRecognizedText(null);
       setInputText('');
 
-      const text = base64 ? await recognizeImageText(base64) : null;
+      const text = await recognizeImageText(uri);
       if (text) {
         setRecognizedText(text);
+        // 不自动填入输入框，识别结果静默发送给后端
       }
     }
   };
 
+  // 拍照
   const handleTakePhoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
@@ -568,239 +584,44 @@ export default function TutorScreen() {
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: false,
       quality: 0.6,
-      base64: true,
     });
 
     if (!result.canceled && result.assets[0]) {
-      const asset = result.assets[0];
-      const uri = asset.uri;
-      let base64 = '';
-      try {
-        base64 = await getImageBase64FromAsset(asset);
-      } catch (error) {
-        console.log('Failed to read captured image base64:', error);
-      }
-
+      const uri = result.assets[0].uri;
       setSelectedImage(uri);
-      setSelectedImageBase64(base64 || null);
       setRecognizedText(null);
       setInputText('');
 
-      const text = base64 ? await recognizeImageText(base64) : null;
+      const text = await recognizeImageText(uri);
       if (text) {
         setRecognizedText(text);
+        // 不自动填入输入框，识别结果静默发送给后端
       }
     }
   };
 
-  const buildDropSignature = (
-    message: string,
-    imageBase64?: string | null,
-    imageUri?: string | null
-  ): string => {
-    const normalizedMessage = message.trim().replace(/\s+/g, ' ').slice(0, 240);
-    const imageFingerprint = imageBase64
-      ? `${imageBase64.slice(0, 32)}:${imageBase64.length}`
-      : imageUri || 'no-image';
-
-    return `${normalizedMessage}::${imageFingerprint}`;
-  };
-
-  const handleDropEffects = (result: DropUpdateResult) => {
-    if (result.goalReached) {
-      Toast.show({
-        type: 'success',
-        text1: 'Daily goal met!',
-        text2: result.unlockedStamp
-          ? `You've nurtured ${result.unlockedStamp.label}.`
-          : 'Your Learning Drop is full for today.',
-      });
-    }
-
-    if (result.unlockedStamp) {
-      setCelebration(result.unlockedStamp);
-      return;
-    }
-
-    if (result.duplicate) {
-      Toast.show({
-        type: 'info',
-        text1: 'No extra drop this time',
-        text2: 'Repeated questions do not add another drop.',
-      });
-    }
-  };
-
-  const handleOpenFinishLearning = useCallback(async () => {
-    const todaySolved = await getTodayDrops();
-
-    await trackLocalEvent('click_finish_learning', {
-      today_solved: todaySolved,
-    });
-
-    if (todaySolved <= 0) {
-      Toast.show({
-        type: 'info',
-        text1: FINISH_LEARNING_EMPTY_TOAST,
-      });
-      return;
-    }
-
-    setShowFinishModal(true);
-  }, []);
-
-  const handleGenerateReport = useCallback(async () => {
-    setShowFinishModal(false);
-    setIsGeneratingReport(true);
-
-    try {
-      const report = await getTodayStudyReportData();
-      setReportData(report);
-
-      await trackLocalEvent('generate_report_card', {
-        total_mins: report.totalMins,
-        total_solved: report.totalSolved,
-      });
-
-      setShowReportCard(true);
-    } catch (error) {
-      console.error('Failed to generate report card:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Failed to generate report',
-        text2: 'Please try again in a moment.',
-      });
-    } finally {
-      setIsGeneratingReport(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!params.openReport) {
-      return;
-    }
-
-    const reportLaunchKey = String(params.reportLaunchToken || 'default');
-    if (reportLaunchHandledRef.current === reportLaunchKey) {
-      return;
-    }
-
-    if (showReportCard || isGeneratingReport) {
-      return;
-    }
-
-    reportLaunchHandledRef.current = reportLaunchKey;
-    void handleGenerateReport();
-  }, [handleGenerateReport, isGeneratingReport, params.openReport, params.reportLaunchToken, showReportCard]);
-
-  const handleShareReport = useCallback(async () => {
-    if (!reportData) {
-      return;
-    }
-
-    const breakdownText = REPORT_SUBJECT_LABELS
-      .map(({ key, label }) => `${label}: ${reportData.subjectBreakdown[key]}`)
-      .join(' · ');
-
-    const message = [
-      'Gauth Study Report Card',
-      `Today’s Focus Time: ${reportData.totalMins} min`,
-      `Problems Solved: ${reportData.totalSolved}`,
-      `Subject Breakdown: ${breakdownText}`,
-    ].join('\n');
-
-    let shareTarget = 'copy';
-
-    try {
-      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && (navigator as any).share) {
-        await (navigator as any).share({
-          title: 'Gauth Study Report Card',
-          text: message,
-        });
-        shareTarget = 'ig';
-      } else {
-        await Share.share({ message, title: 'Gauth Study Report Card' });
-        shareTarget = 'tiktok';
-      }
-    } catch (error) {
-      if (String(error).toLowerCase().includes('abort')) {
-        return;
-      }
-      shareTarget = 'copy';
-      console.error('Share report failed:', error);
-      Toast.show({
-        type: 'info',
-        text1: 'Share failed',
-        text2: 'Please try again.',
-      });
-    } finally {
-      await trackLocalEvent('share_report_card', {
-        share_target: shareTarget,
-      });
-    }
-  }, [reportData]);
-
-  const reportBreakdownRows = useMemo(() => {
-    const breakdown = reportData?.subjectBreakdown;
-    const total = breakdown ? Object.values(breakdown).reduce((sum, count) => sum + count, 0) : 0;
-
-    return REPORT_SUBJECT_LABELS.map(({ key, label }) => {
-      const value = breakdown?.[key] ?? 0;
-
-      return {
-        key,
-        label,
-        value,
-        color: REPORT_SUBJECT_COLORS[key],
-        percent: total > 0 ? Math.round((value / total) * 100) : 0,
-      };
-    });
-  }, [reportData]);
-
-  const totalSubjectsSolved = useMemo(() => {
-    return reportBreakdownRows.reduce((sum, item) => sum + item.value, 0);
-  }, [reportBreakdownRows]);
-
-  const reportDisplayRows = useMemo(() => {
-    return reportBreakdownRows.filter((item) => item.key !== 'Other' || item.value > 0);
-  }, [reportBreakdownRows]);
-
-  const reportDonutSegments = useMemo(() => {
-    const chartRows = reportDisplayRows.length > 0 ? reportDisplayRows : reportBreakdownRows;
-    const rowsWithValue = chartRows.some((item) => item.value > 0)
-      ? chartRows
-      : chartRows.map((item) => ({
-          ...item,
-          value: 1,
-        }));
-    const total = rowsWithValue.reduce((sum, item) => sum + item.value, 0);
-
-    let accumulatedRatio = 0;
-
-    return rowsWithValue.map((item) => {
-      const ratio = total > 0 ? item.value / total : 0;
-      const dashLength = ratio * REPORT_DONUT_CIRCUMFERENCE;
-      const segment = {
-        key: item.key,
-        color: item.color,
-        strokeDasharray: `${dashLength} ${REPORT_DONUT_CIRCUMFERENCE}`,
-        strokeDashoffset: -accumulatedRatio * REPORT_DONUT_CIRCUMFERENCE,
-      };
-
-      accumulatedRatio += ratio;
-      return segment;
-    });
-  }, [reportBreakdownRows, reportDisplayRows]);
-
+  // 发送消息
   const handleSend = useCallback(async () => {
     const imageToSend = selectedImage;
-    const imageBase64ToSend = selectedImageBase64;
-    const messageToBackend = recognizedText ? `${recognizedText}\n\n${inputText.trim()}` : inputText.trim();
-    const messageToDisplay = imageToSend
-      ? `[图片]${inputText.trim() ? `\n${inputText.trim()}` : ''}`
-      : inputText.trim();
+    const trimmedInput = inputText.trim();
+    const normalizedEasterEggInput = normalizeStyleCommand(trimmedInput);
 
-    if (!messageToBackend.trim() && !imageToSend && !imageBase64ToSend) return;
+    if (!imageToSend && normalizedEasterEggInput === '换个风格') {
+      setInputText('');
+      openStylePicker();
+      return;
+    }
+
+    // 构建发送给后端的消息（包含识别结果和用户输入）
+    const messageToBackend = recognizedText 
+      ? `${recognizedText}\n\n${trimmedInput}`
+      : trimmedInput;
+    // 用户消息气泡显示：有图片时显示"[图片]"前缀
+    const messageToDisplay = imageToSend
+      ? `[图片]${trimmedInput ? '\n' + trimmedInput : ''}`
+      : trimmedInput;
+
+    if (!messageToBackend.trim() && !imageToSend) return;
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -810,215 +631,237 @@ export default function TutorScreen() {
       timestamp: new Date(),
     };
 
-    const optimisticMessages = [...messages, userMessage];
-    setMessages(optimisticMessages);
+    setMessages((prev) => [...prev, userMessage]);
     setInputText('');
     setSelectedImage(null);
-    setSelectedImageBase64(null);
     setRecognizedText(null);
     setIsTyping(true);
     scrollToBottom();
 
     try {
-      const history = messages.slice(-10).map((message) => ({
-        role: message.role,
-        content: message.content,
+      const history = messages.slice(-10).map((msg) => ({
+        role: msg.role,
+        content: msg.content,
       }));
 
-      let imageBase64 = imageBase64ToSend || '';
-      if (!imageBase64 && imageToSend) {
+      let imageBase64 = '';
+      if (imageToSend) {
         try {
           imageBase64 = await readImageAsBase64(imageToSend);
-        } catch (error) {
-          console.log('Failed to read image:', error);
+        } catch (e) {
+          console.log('Failed to read image:', e);
+          Alert.alert('图片读取失败', '当前图片读取失败，请重新选择图片后再试。');
+          return;
         }
       }
 
-      const response = await fetch(`${BACKEND_BASE_URL}/api/v1/tutor`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: messageToBackend,
-          persona: currentPersona,
-          history,
-          imageBase64: imageBase64 || null,
-        }),
-      });
+      /**
+       * 服务端文件：server/src/index.ts
+       * 接口：POST /api/v1/tutor
+       * Body 参数：message: string, persona: string, history: Array<{role: string, content: string}>, imageBase64?: string
+       */
+      const response = await fetch(
+        buildApiUrl('/api/v1/tutor'),
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: messageToBackend,
+            persona: currentPersona,
+            history,
+            imageBase64: imageBase64 || null,
+          }),
+        }
+      );
 
       if (response.ok) {
         const data = await response.json();
-        const parsedReply = extractSubjectTag(data.content);
         const assistantMessage: ChatMessage = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
-          content: parsedReply.content,
+          content: data.content,
           timestamp: new Date(),
         };
 
-        const nextMessages = [...messages, userMessage, assistantMessage];
-        setMessages(nextMessages);
-        await saveChatHistory(nextMessages);
+        const newMessages = [...messages, userMessage, assistantMessage];
+        setMessages(newMessages);
+        await saveChatHistory(newMessages);
 
-        try {
-          const dedupeKey = buildDropSignature(messageToBackend, imageBase64, imageToSend);
-          const dropResult = await addDrop({ dedupeKey });
-          setTodayDrops(dropResult.drops);
+        if (isVoiceEnabled) {
+          latestAssistantMessageIdRef.current = assistantMessage.id;
+          await handlePlayMessage(assistantMessage, { isAuto: true });
+        }
 
-          if (dropResult.added) {
-            await recordTutorSolvedSubject(parsedReply.subject);
-          }
+        const newDrops = await addDrop();
+        setTodayDrops(newDrops);
 
-          handleDropEffects(dropResult);
-        } catch (dropError) {
-          console.error('Learning Drop update error:', dropError);
+        if (newDrops >= 10) {
+          Alert.alert('满杯达成!', '恭喜你完成了今日学习目标!');
         }
       } else {
-        const errorText = await response.text();
-        throw new Error(`API error ${response.status}: ${errorText}`);
+        throw new Error('API error');
       }
-    } catch (error) {
-      console.error('Tutor API error:', error);
-      const fallbackMessage: ChatMessage = {
+    } catch {
+      const fallbackMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: 'Let me think... can you share the problem one more time with a bit more detail?',
+        content: '让我想想... 你能再描述一下你的问题吗?',
         timestamp: new Date(),
       };
-      const nextMessages = [...messages, userMessage, fallbackMessage];
-      setMessages(nextMessages);
-      await saveChatHistory(nextMessages);
+      const newMessages = [...messages, userMessage, fallbackMsg];
+      setMessages(newMessages);
+      await saveChatHistory(newMessages);
     } finally {
       setIsTyping(false);
       scrollToBottom();
     }
-  }, [currentPersona, inputText, messages, recognizedText, selectedImage, selectedImageBase64]);
+  }, [currentPersona, handlePlayMessage, inputText, isVoiceEnabled, messages, openStylePicker, readImageAsBase64, recognizedText, selectedImage]);
 
   return (
-    <Screen>
-      <View className="flex-1">
-        <View className="px-5 pt-4 pb-3">
-          <View className="flex-row items-center justify-between mb-4">
-            <View className="flex-row items-center">
-              <Text className="text-xl font-bold text-[var(--color-foreground)] tracking-tight">
-                AI Tutor
-              </Text>
-              <View className="ml-2 px-2 py-0.5 bg-[#F5F5F7] rounded-full">
-                <Text className="text-xs text-[var(--color-muted)]">{todayDrops}/{DAILY_DROP_LIMIT}</Text>
-              </View>
-            </View>
-            <View className="flex-row items-center gap-3">
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => {
-                  void handleOpenFinishLearning();
-                }}
-                className="flex-row items-center rounded-full border border-[#F2E6EA] bg-[#FFF7F9] px-3 py-1.5"
-              >
-                <FontAwesome6 name="flag-checkered" size={11} color="#D93A6A" />
-                <Text className="ml-1.5 text-xs font-semibold text-[#D93A6A]">Finish Learning</Text>
-              </TouchableOpacity>
-              <TouchableOpacity activeOpacity={0.7} onPress={() => router.push('/')}>
-                <FontAwesome6 name="house" size={18} color="var(--color-muted)" />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <View>
-            <ScrollView
-              ref={personaScrollRef}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingRight: 20 }}
->
-              <View className="flex-row gap-2">
-              {PERSONAS.map((persona) => {
-                const config = PERSONA_CONFIG[persona];
-                const isActive = persona === currentPersona;
-                return (
-                  <TouchableOpacity
-                    key={persona}
-                    activeOpacity={0.7}
-                    onPress={() => handlePersonaChange(persona)}
-                    className={`px-4 py-2 rounded-full ${
-                      isActive ? 'bg-[var(--color-foreground)]' : 'bg-[var(--color-surface)]'
-                    }`}
-                    style={{
-                      shadowColor: '#000',
-                      shadowOffset: { width: 0, height: 1 },
-                      shadowOpacity: isActive ? 0 : 0.04,
-                      shadowRadius: 4,
-                      elevation: isActive ? 0 : 1,
-                    }}
-                  >
-                    <View className="items-center mb-1">
-                      <FontAwesome6
-                        name={config.icon as any}
-                        size={14}
-                        color={isActive ? '#fff' : config.iconColor}
+    <Screen safeAreaEdges={['left', 'right', 'bottom']}>
+      <View className="flex-1 relative">
+        <View className="absolute top-0 left-0 right-0 z-20">
+          <TouchableOpacity
+            activeOpacity={0.92}
+            onPress={() => setIsProfileExpanded((prev) => !prev)}
+          >
+            <View
+              className="px-5 pb-5"
+              style={{
+                paddingTop: insets.top + 16,
+                backgroundColor: isProfileExpanded ? persona.color : 'var(--color-surface)',
+                borderBottomLeftRadius: 32,
+                borderBottomRightRadius: 32,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.04,
+                shadowRadius: 8,
+                elevation: 1,
+              }}
+            >
+              <View className="p-4 rounded-[28px]">
+              <View className="flex-row items-start justify-between">
+                <View className="flex-row items-center flex-1">
+                  <View className="relative">
+                    <View
+                      className="w-16 h-16 rounded-2xl items-center justify-center"
+                      style={{
+                        backgroundColor: isProfileExpanded ? 'rgba(255,255,255,0.2)' : persona.color,
+                        width: 64,
+                        height: 64,
+                        borderRadius: 16,
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <Image
+                        source={PERSONA_AVATARS[currentPersona]}
+                        style={{ width: 56, height: 56, borderRadius: 12 }}
+                        resizeMode="cover"
                       />
                     </View>
-                    <Text className={`text-xs font-medium ${isActive ? 'text-white' : 'text-[var(--color-muted)]'}`}>
-                      {config.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-                })}
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={(event) => {
+                        event.stopPropagation();
+                        setIsVoiceEnabled((prev) => !prev);
+                      }}
+                      className="absolute -right-1 -bottom-1 w-6 h-6 rounded-full items-center justify-center border border-white"
+                      style={{ backgroundColor: isVoiceEnabled ? '#22C55E' : '#111827' }}
+                    >
+                      <FontAwesome6
+                        name={isVoiceEnabled ? 'volume-high' : 'volume-xmark'}
+                        size={10}
+                        color="#fff"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                  <View className="ml-4 flex-1">
+                    <View className="flex-row items-center">
+                      <Text className={`text-xl font-bold tracking-tight ${
+                        isProfileExpanded ? 'text-white' : 'text-[var(--color-foreground)]'
+                      }`}>
+                        {persona.label}
+                      </Text>
+                      <View className="ml-2 px-2 py-0.5 bg-[#F5F5F7] rounded-full">
+                        <Text className="text-xs text-[var(--color-muted)]">
+                          {todayDrops}/10
+                        </Text>
+                      </View>
+                    </View>
+                    <View className="flex-row flex-wrap gap-2 mt-2">
+                      {persona.traits.map((trait) => (
+                        <View
+                          key={trait}
+                          className={`px-2.5 py-1 rounded-full ${
+                            isProfileExpanded ? 'bg-white/16 border border-white/20' : 'bg-[#F5F5F7]'
+                          }`}
+                        >
+                          <Text className={`text-xs font-semibold ${
+                            isProfileExpanded ? 'text-white' : 'text-[var(--color-muted)]'
+                          }`}>
+                            {trait}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                </View>
+                <View
+                  className="w-7 h-7 rounded-full items-center justify-center"
+                  style={{ backgroundColor: isProfileExpanded ? 'rgba(255,255,255,0.16)' : '#F5F5F7' }}
+                >
+                  <FontAwesome6
+                    name={isProfileExpanded ? 'chevron-up' : 'chevron-down'}
+                    size={12}
+                    color={isProfileExpanded ? '#fff' : 'var(--color-muted)'}
+                  />
+                </View>
               </View>
-            </ScrollView>
-          </View>
-        </View>
 
+              {isProfileExpanded && (
+                <View className="mt-5">
+                  <Text className="text-[22px] font-bold text-white leading-[34px] mt-1">
+                    {persona.typicalLanguage}
+                  </Text>
+
+                  <View className="h-px bg-white/25 my-5" />
+
+                  <Text className="text-[16px] font-bold text-white leading-6">
+                    {persona.solvingStyleTitle}
+                  </Text>
+                  <Text className="text-[13px] text-white/92 leading-6 mt-2.5">
+                    {persona.solvingStyleDescription}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </View>
+
+        {/* Messages */}
         <ScrollView
           ref={scrollViewRef}
           className="flex-1 px-5"
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingVertical: 16, paddingBottom: keyboardHeight > 0 ? 16 : 8 }}
+          contentContainerStyle={{
+            paddingTop: isProfileExpanded ? insets.top + 380 : insets.top + 140,
+            paddingBottom: keyboardHeight > 0 ? 16 : 8,
+          }}
         >
-          {messages.map((message) =>
-            message.role === 'system' ? (
-              <View key={message.id} className="items-center mb-4">
-                <View className="px-3 py-1.5 rounded-full bg-[var(--color-surface)]">
-                  <Text className="text-xs text-[var(--color-muted)] font-medium">{message.content}</Text>
-                </View>
-              </View>
-            ) : (
+          {messages.map((message) => (
+            <View
+              key={message.id}
+              className={`flex-row mb-4 ${
+                message.role === 'user' ? 'justify-end' : 'justify-start'
+              }`}
+            >
               <View
-                key={message.id}
-                className={`flex-row mb-4 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <View
-                  className={`max-w-[80%] px-4 py-3 rounded-2xl ${
-                    message.role === 'user'
-                      ? 'bg-[var(--color-foreground)] rounded-tr-md'
-                      : 'bg-[var(--color-surface)] rounded-tl-md'
-                  }`}
-                  style={{
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.03,
-                    shadowRadius: 4,
-                    elevation: 1,
-                  }}
-                >
-                  {message.imageUri ? (
-                    <Image source={{ uri: message.imageUri }} className="w-40 h-40 rounded-xl mb-2" resizeMode="cover" />
-                  ) : null}
-                  <Text
-                    className={`text-sm leading-relaxed ${
-                      message.role === 'user' ? 'text-white' : 'text-[var(--color-foreground)]'
-                    }`}
-                  >
-                    {message.content}
-                  </Text>
-                </View>
-              </View>
-            )
-          )}
-
-          {isTyping ? (
-            <View className="flex-row mb-4 justify-start">
-              <View
-                className="bg-[var(--color-surface)] px-4 py-3 rounded-2xl rounded-tl-md"
+                className={`max-w-[80%] px-4 py-3 rounded-2xl ${
+                  message.role === 'user'
+                    ? 'bg-[var(--color-foreground)] rounded-tr-md'
+                    : 'bg-[var(--color-surface)] rounded-tl-md'
+                }`}
                 style={{
                   shadowColor: '#000',
                   shadowOffset: { width: 0, height: 1 },
@@ -1027,293 +870,324 @@ export default function TutorScreen() {
                   elevation: 1,
                 }}
               >
+                {message.imageUri && (
+                  <Image
+                    source={{ uri: message.imageUri }}
+                    style={{ width: 160, height: 160, borderRadius: 12, marginBottom: 8 }}
+                    resizeMode="cover"
+                  />
+                )}
+                <Text
+                  className={`text-sm leading-relaxed ${
+                    message.role === 'user'
+                      ? 'text-white'
+                      : 'text-[var(--color-foreground)]'
+                  }`}
+                >
+                  {message.content}
+                </Text>
+              </View>
+            </View>
+          ))}
+
+          {isTyping && (
+            <View className="flex-row mb-4 justify-start">
+              <View className="bg-[var(--color-surface)] px-4 py-3 rounded-2xl rounded-tl-md" style={{
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.03,
+                shadowRadius: 4,
+                elevation: 1,
+              }}>
                 <View className="flex-row items-center">
                   <Text className="text-xs text-[var(--color-muted)] mr-2">
-                    {PERSONA_CONFIG[currentPersona].label} is thinking
+                    {persona.label} is thinking
                   </Text>
                   <AnimatedDots />
                 </View>
               </View>
             </View>
-          ) : null}
+          )}
         </ScrollView>
 
-        {selectedImage ? (
-          <View className="px-5 pt-3">
-            <View className="bg-[var(--color-surface)] rounded-2xl p-3 flex-row items-center">
-              <Image source={{ uri: selectedImage }} className="w-14 h-14 rounded-xl mr-3" resizeMode="cover" />
-              <View className="flex-1">
-                <Text className="text-sm font-medium text-[var(--color-foreground)]">Image attached</Text>
-                <Text className="text-xs text-[var(--color-muted)] mt-1">
-                  {isRecognizing ? 'Recognizing text...' : recognizedText ? 'Text recognized and ready to send' : 'Will send as image question'}
-                </Text>
+        {/* Selected Image Preview */}
+        {selectedImage && (
+          <View className="px-5 pb-3">
+            <View className="flex-row items-center bg-[var(--color-surface)] rounded-2xl p-3"
+              style={{
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.04,
+                shadowRadius: 8,
+                elevation: 1,
+              }}
+            >
+              <View className="relative">
+                <Image
+                  source={{ uri: selectedImage }}
+                  style={{ width: 56, height: 56, borderRadius: 12 }}
+                  resizeMode="cover"
+                />
+                <TouchableOpacity
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-[#FF3B30] rounded-full items-center justify-center"
+                  onPress={() => {
+                    setSelectedImage(null);
+                    setRecognizedText(null);
+                    setInputText('');
+                  }}
+                >
+                  <FontAwesome6 name="xmark" size={10} color="#fff" />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity onPress={() => {
-                setSelectedImage(null);
-                setSelectedImageBase64(null);
-                setRecognizedText(null);
-              }}>
-                <FontAwesome6 name="xmark" size={16} color="var(--color-muted)" />
-              </TouchableOpacity>
+              <View className="flex-1 ml-3">
+                {isRecognizing ? (
+                  <View className="flex-row items-center">
+                    <ActivityIndicator size="small" color="var(--color-muted)" />
+                    <Text className="text-xs text-[var(--color-muted)] ml-2">
+                      识别中...
+                    </Text>
+                  </View>
+                ) : recognizedText ? (
+                  <Text className="text-xs text-[var(--color-muted)]" numberOfLines={2}>
+                    已识别文字
+                  </Text>
+                ) : (
+                  <Text className="text-xs text-[var(--color-muted)]">
+                    可编辑识别结果
+                  </Text>
+                )}
+              </View>
             </View>
           </View>
-        ) : null}
+        )}
 
-        <View className="px-5 pt-3 pb-5" style={{ paddingBottom: keyboardHeight > 0 ? keyboardHeight + 12 : 20 }}>
-          <View className="bg-[var(--color-surface)] rounded-[28px] px-4 py-3">
+        {/* Clean Input Area */}
+        <View className={`px-5 ${Platform.OS === 'ios' ? '' : 'pb-5'} pt-2`} style={{ paddingBottom: Platform.OS === 'ios' ? Math.max(keyboardHeight - 34, 20) : 20 }}>
+          <View className="flex-row items-end bg-[var(--color-surface)] rounded-2xl px-4 py-3"
+            style={{
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.04,
+              shadowRadius: 8,
+              elevation: 1,
+            }}
+          >
+            <View className="flex-row gap-2 mr-3">
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={handlePickImage}
+                className="w-10 h-10 rounded-full bg-[#F5F5F7] items-center justify-center"
+              >
+                <FontAwesome6 name="image" size={16} color="var(--color-muted)" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={handleTakePhoto}
+                className="w-10 h-10 rounded-full bg-[#F5F5F7] items-center justify-center"
+              >
+                <FontAwesome6 name="camera" size={16} color="var(--color-muted)" />
+              </TouchableOpacity>
+            </View>
             <TextInput
+              className="flex-1 text-sm text-[var(--color-foreground)] max-h-24"
+              placeholder={isRecognizing ? "识别中..." : "输入问题..."}
+              placeholderTextColor="var(--color-muted)"
               value={inputText}
               onChangeText={setInputText}
               multiline
-              placeholder="Ask a question or upload a problem..."
-              placeholderTextColor="#9CA3AF"
-              className="text-[15px] text-[var(--color-foreground)] min-h-[42px] max-h-28"
+              textAlignVertical="center"
+              editable={!isRecognizing}
             />
-            <View className="flex-row items-center justify-between mt-3">
-              <View className="flex-row items-center gap-3">
-                <TouchableOpacity activeOpacity={0.7} onPress={handlePickImage}>
-                  <FontAwesome6 name="image" size={18} color="var(--color-muted)" />
-                </TouchableOpacity>
-                <TouchableOpacity activeOpacity={0.7} onPress={handleTakePhoto}>
-                  <FontAwesome6 name="camera" size={18} color="var(--color-muted)" />
-                </TouchableOpacity>
-              </View>
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={handleSend}
-                className="w-10 h-10 rounded-full bg-[var(--color-foreground)] items-center justify-center"
-                disabled={isTyping || isGeneratingReport}
-              >
-                {isTyping || isGeneratingReport ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <FontAwesome6 name="arrow-up" size={14} color="#fff" />
-                )}
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleSend}
+              disabled={(!inputText.trim() && !selectedImage) || isRecognizing}
+              className={`w-10 h-10 rounded-full items-center justify-center ml-3 ${
+                (inputText.trim() || selectedImage) && !isRecognizing
+                  ? 'bg-[var(--color-foreground)]'
+                  : 'bg-[#E5E5EA]'
+              }`}
+            >
+              <FontAwesome6
+                name="paper-plane"
+                size={14}
+                color={
+                  (inputText.trim() || selectedImage) && !isRecognizing
+                    ? '#fff'
+                    : 'var(--color-muted)'
+                }
+              />
+            </TouchableOpacity>
           </View>
         </View>
-      </View>
 
-      <Modal
-        visible={showFinishModal}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setShowFinishModal(false)}
-      >
-        <View className="flex-1 items-center justify-center px-5">
-          <TouchableOpacity
-            activeOpacity={1}
-            onPress={() => setShowFinishModal(false)}
-            className="absolute inset-0 bg-black/45"
-          />
-          <View
-            className="w-full max-w-[760px] rounded-[40px] bg-white px-6 py-7"
-            style={{
-              shadowColor: '#120811',
-              shadowOffset: { width: 0, height: 12 },
-              shadowOpacity: 0.16,
-              shadowRadius: 24,
-              elevation: 8,
-            }}
-          >
-            <Text allowFontScaling={false} className="text-center text-[40px] font-black tracking-[-0.8px] text-[#140B16]">
-              Wrap up for today?
-            </Text>
-            <Text allowFontScaling={false} className="mt-4 text-center text-[18px] leading-[27px] text-[#5A667A]">
-              You can keep going or generate your study report card now.
-            </Text>
-            <View className="mt-8 flex-row gap-4">
-              <TouchableOpacity
-                className="h-[72px] flex-1 items-center justify-center rounded-[24px] border-[2px] border-[#FF0B4F] bg-white"
-                activeOpacity={0.85}
-                onPress={() => setShowFinishModal(false)}
-              >
-                <Text allowFontScaling={false} className="text-[16px] font-bold text-[#09070D]">
-                  Keep Learning
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                className="h-[72px] flex-1 items-center justify-center rounded-[24px] bg-[#FF0040] px-3"
-                activeOpacity={0.85}
-                onPress={() => {
-                  void handleGenerateReport();
-                }}
-              >
-                <Text allowFontScaling={false} className="text-center text-[16px] font-bold leading-[22px] text-white">
-                  Generate Report
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
-        visible={showReportCard}
-        animationType="slide"
-        transparent={false}
-        onRequestClose={() => setShowReportCard(false)}
-      >
-        <View className="flex-1 bg-[#F9F2F7]">
-          <ScrollView
-            className="flex-1"
-            contentContainerStyle={{ paddingHorizontal: 22, paddingTop: 40, paddingBottom: 26 }}
-            showsVerticalScrollIndicator={false}
-          >
-            
-            <Text className="mt-2 text-center text-[20px] font-bold tracking-[-0.2px] text-[#221A22]">
-              Daily Learning Report
-            </Text>
-            <Text className="mt-2 text-center text-[12px] leading-[18px] text-[#5F4A56]">
-              You have completed today&apos;s learning tasks
-            </Text>
-
-            <View className="mt-6 flex-row gap-4">
-              <View
-                className="flex-1 rounded-[18px] border border-[#E5DFE3] bg-[#FAF9FA] px-4 py-4"
-                style={{
-                  shadowColor: '#2B1D24',
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.05,
-                  shadowRadius: 10,
-                  elevation: 2,
-                }}
-              >
-                <Text className="text-[14px] leading-[19px] text-[#4D3843]">Problem Solved</Text>
-                <Text className="mt-3 text-[22px] font-bold text-[#FF184F]">
-                  {reportData?.totalSolved ?? 0} Questions
-                </Text>
-              </View>
-
-              <View
-                className="flex-1 rounded-[18px] border border-[#E5DFE3] bg-[#FAF9FA] px-4 py-4"
-                style={{
-                  shadowColor: '#2B1D24',
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.05,
-                  shadowRadius: 10,
-                  elevation: 2,
-                }}
-              >
-                <Text className="text-center text-[14px] leading-[19px] text-[#4D3843]">Time Spent</Text>
-                <View className="mt-3 flex-row items-center justify-center">
-                  <View className="mr-2 h-5 w-5 items-center justify-center rounded-full bg-[#FF184F]">
-                    <FontAwesome6 name="clock" size={9} color="#fff" />
-                  </View>
-                  <Text className="text-[22px] font-bold text-[#FF184F]">
-                    {reportData?.totalMins ?? 0} Minute
+        <Modal
+          visible={isStylePickerVisible}
+          animationType="fade"
+          transparent
+          onRequestClose={() => setIsStylePickerVisible(false)}
+        >
+          <View className="flex-1 bg-black/45 justify-end">
+            <View className="rounded-t-[32px] bg-[var(--color-background)] px-5 pt-5 pb-8">
+              <View className="flex-row items-center justify-between mb-4">
+                <View>
+                  <Text className="text-xl font-bold text-[var(--color-foreground)]">
+                    换个风格
+                  </Text>
+                  <Text className="text-sm text-[var(--color-muted)] mt-1">
+                    左右滑动，挑一个最适合现在状态的 tutor。
                   </Text>
                 </View>
-              </View>
-            </View>
-
-            <View className="mt-5 rounded-[24px] border border-[#E5E6EA] bg-[#F8F8FA] px-4 py-5">
-              <Text className="text-[15px] font-semibold text-[#151318]">Subject Distribution</Text>
-
-              <View className="mt-4 items-center justify-center">
-                <View className="h-[184px] w-[184px] items-center justify-center">
-                  <Svg
-                    width={REPORT_DONUT_SIZE}
-                    height={REPORT_DONUT_SIZE}
-                    style={{ transform: [{ rotate: '-90deg' }] }}
-                  >
-                    <Circle
-                      cx={REPORT_DONUT_SIZE / 2}
-                      cy={REPORT_DONUT_SIZE / 2}
-                      r={REPORT_DONUT_RADIUS}
-                      fill="none"
-                      stroke="#E3E5E8"
-                      strokeWidth={REPORT_DONUT_STROKE_WIDTH}
-                    />
-                    {reportDonutSegments.map((segment) => (
-                      <Circle
-                        key={segment.key}
-                        cx={REPORT_DONUT_SIZE / 2}
-                        cy={REPORT_DONUT_SIZE / 2}
-                        r={REPORT_DONUT_RADIUS}
-                        fill="none"
-                        stroke={segment.color}
-                        strokeWidth={REPORT_DONUT_STROKE_WIDTH}
-                        strokeLinecap="round"
-                        strokeDasharray={segment.strokeDasharray}
-                        strokeDashoffset={segment.strokeDashoffset}
-                      />
-                    ))}
-                  </Svg>
-                  <View className="absolute items-center justify-center">
-                    <Text className="text-[16px] font-medium text-[#201B21]">Total</Text>
-                    <Text className="text-[40px] leading-[44px] font-semibold text-[#201B21]">{totalSubjectsSolved}</Text>
-                  </View>
-                </View>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => setIsStylePickerVisible(false)}
+                  className="w-10 h-10 rounded-full bg-[var(--color-surface)] items-center justify-center"
+                >
+                  <FontAwesome6 name="xmark" size={16} color="var(--color-muted)" />
+                </TouchableOpacity>
               </View>
 
-              <View className="mt-4 gap-4">
-                {reportDisplayRows.map((item) => (
-                  <View key={item.key}>
-                    <View className="flex-row items-center justify-between">
-                      <View className="flex-row items-center">
-                        <View
-                          className="mr-2 h-[12px] w-[12px] rounded-full"
-                          style={{ backgroundColor: item.color }}
-                        />
-                        <Text className="text-[14px] text-[#1F1A20]">{item.label}</Text>
-                      </View>
-                      <View className="flex-row items-center gap-3">
-                        <Text className="text-[14px] font-medium text-[#1F1A20]">{item.value} Questions</Text>
-                        <Text className="w-8 text-right text-[14px] text-[#3F2F37]">{item.percent}%</Text>
-                      </View>
-                    </View>
-                    <View className="mt-3 h-[6px] rounded-full bg-[#E0E2E6]">
-                      <View
-                        className="h-[6px] rounded-full"
-                        style={{
-                          width: `${item.percent}%`,
-                          backgroundColor: item.color,
+              <FlatList
+                ref={styleListRef}
+                data={TUTOR_PERSONAS}
+                keyExtractor={(item) => item}
+                horizontal
+                pagingEnabled
+                decelerationRate="fast"
+                showsHorizontalScrollIndicator={false}
+                onScroll={(event) => updateStyleByOffset(event.nativeEvent.contentOffset.x)}
+                scrollEventThrottle={16}
+                onScrollEndDrag={handleStyleScrollEnd}
+                onMomentumScrollEnd={handleStyleScrollEnd}
+                getItemLayout={(_, index) => ({
+                  length: screenWidth,
+                  offset: screenWidth * index,
+                  index,
+                })}
+                renderItem={({ item }) => {
+                  const itemPersona = PERSONA_CONFIG[item];
+                  const isSelected = item === selectedStylePersona;
+
+                  return (
+                    <View style={{ width: screenWidth }} className="items-center">
+                      <TouchableOpacity
+                        activeOpacity={0.92}
+                        onPress={() => {
+                          setSelectedStylePersona(item);
+                          styleListRef.current?.scrollToIndex({
+                            index: TUTOR_PERSONAS.indexOf(item),
+                            animated: true,
+                          });
                         }}
-                      />
+                        style={{ width: styleCardWidth }}
+                      >
+                        <View
+                          className="rounded-[28px] p-5"
+                          style={{
+                            backgroundColor: itemPersona.color,
+                            shadowColor: '#000',
+                            shadowOffset: { width: 0, height: 8 },
+                            shadowOpacity: isSelected ? 0.12 : 0.06,
+                            shadowRadius: 18,
+                            elevation: isSelected ? 5 : 2,
+                            transform: [{ scale: isSelected ? 1 : 0.98 }],
+                          }}
+                        >
+                          <View className="flex-row items-start justify-between">
+                            <View className="flex-row items-center flex-1">
+                              <View
+                                className="w-16 h-16 rounded-2xl items-center justify-center"
+                                style={{
+                                  backgroundColor: 'rgba(255,255,255,0.2)',
+                                  width: 64,
+                                  height: 64,
+                                  borderRadius: 16,
+                                  overflow: 'hidden',
+                                }}
+                              >
+                                <Image
+                                  source={PERSONA_AVATARS[item]}
+                                  style={{ width: 56, height: 56, borderRadius: 12 }}
+                                  resizeMode="cover"
+                                />
+                              </View>
+                              <View className="ml-4 flex-1">
+                                <View className="flex-row items-center flex-wrap">
+                                  <Text className="text-xl font-bold tracking-tight text-white">
+                                    {itemPersona.label}
+                                  </Text>
+                                  <View className="ml-2 px-2 py-0.5 bg-[#F5F5F7] rounded-full">
+                                    <Text className="text-xs text-[var(--color-muted)]">
+                                      {todayDrops}/10
+                                    </Text>
+                                  </View>
+                                </View>
+                                <Text className="text-sm mt-1 text-white/85">
+                                  {itemPersona.subtitle}
+                                </Text>
+                              </View>
+                            </View>
+                            {isSelected && (
+                              <View className="w-7 h-7 rounded-full bg-white/18 items-center justify-center">
+                                <FontAwesome6 name="check" size={12} color="#fff" />
+                              </View>
+                            )}
+                          </View>
+
+                          <View className="mt-5 flex-row flex-wrap gap-2">
+                            {itemPersona.traits.map((trait) => (
+                              <View
+                                key={trait}
+                                className="px-3 py-1.5 rounded-full bg-white/90 border border-white/40"
+                              >
+                                <Text className="text-sm font-medium" style={{ color: itemPersona.color }}>
+                                  {trait}
+                                </Text>
+                              </View>
+                            ))}
+                          </View>
+
+                          <Text className="text-[20px] font-bold text-white leading-8 mt-5">
+                            {itemPersona.typicalLanguage}
+                          </Text>
+
+                          <View className="h-px bg-white/25 my-5" />
+
+                          <Text className="text-[16px] font-bold text-white leading-6">
+                            {itemPersona.solvingStyleTitle}
+                          </Text>
+                          <Text className="text-[13px] text-white/92 leading-6 mt-2.5">
+                            {itemPersona.solvingStyleDescription}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
                     </View>
-                  </View>
+                  );
+                }}
+              />
+
+              <View className="flex-row justify-center gap-2 mt-5 mb-6">
+                {TUTOR_PERSONAS.map((item) => (
+                  <View
+                    key={item}
+                    className={`h-2 rounded-full ${item === selectedStylePersona ? 'w-6' : 'w-2'}`}
+                    style={{ backgroundColor: item === selectedStylePersona ? previewPersona.color : '#D1D5DB' }}
+                  />
                 ))}
               </View>
-            </View>
 
-            <View className="mt-5 gap-3">
               <TouchableOpacity
-                activeOpacity={0.88}
-                onPress={() => {
-                  void handleShareReport();
-                }}
-                className="items-center justify-center rounded-2xl bg-[#FF0040] px-4 py-4"
+                activeOpacity={0.9}
+                onPress={handleApplyStyle}
+                className="rounded-2xl py-4 items-center"
+                style={{ backgroundColor: previewPersona.color }}
               >
-                <Text className="text-base font-semibold text-white">Share to IG/TikTok</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                activeOpacity={0.88}
-                onPress={() => {
-                  setShowReportCard(false);
-                  router.push('/');
-                }}
-                className="items-center justify-center rounded-2xl border border-[#E7D4DC] bg-white px-4 py-4"
-              >
-                <Text className="text-base font-semibold text-[#6D5A63]">Back to Home</Text>
+                <Text className="text-white text-base font-bold">gauth it</Text>
               </TouchableOpacity>
             </View>
-          </ScrollView>
-        </View>
-      </Modal>
-
-      <ConfettiCelebration
-        visible={Boolean(celebration)}
-        title={celebration ? `Congratulations! You've nurtured ${celebration.label}!` : ''}
-        description={celebration ? `Check it out in your Mind Garden. ${celebration.dedication}` : ''}
-        ctaLabel="Open Mind Garden"
-        onClose={() => setCelebration(null)}
-        onCta={() => {
-          setCelebration(null);
-          router.push('/profile');
-        }}
-      />
+          </View>
+        </Modal>
+      </View>
     </Screen>
   );
 }

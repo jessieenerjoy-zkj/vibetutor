@@ -1,12 +1,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Crypto from 'expo-crypto';
 import {
   MoodType,
   TutorPersona,
+  TtsVoice,
   MoodRecord,
   DropsData,
   LikeRecord,
   ChatMessage,
   SubjectType,
+  normalizeMoodType,
+  normalizeTutorPersona,
+  TTS_VOICES,
 } from './types';
 import {
   DAILY_DROP_LIMIT,
@@ -17,11 +22,13 @@ import {
 } from './learning';
 
 const KEYS = {
+  INSTALLATION_ID: 'installationId',
   MOOD_HISTORY: 'moodHistory',
   DAILY_DROPS: 'dailyDrops',
   DAILY_DROP_SIGNATURES: 'dailyDropSignatures',
   LIKED_MOTD: 'likedMOTD',
   CURRENT_PERSONA: 'currentPersona',
+  PERSONA_VOICE_PREFERENCES: 'personaVoicePreferences',
   CHAT_HISTORY: 'chatHistory',
   TUTOR_GREETING_STATE: 'tutorGreetingState',
   ANALYTICS_EVENTS: 'analyticsEvents',
@@ -43,6 +50,8 @@ interface AnalyticsEventRecord {
   params?: Record<string, unknown>;
   timestamp: string;
 }
+
+type PersonaVoicePreferences = Partial<Record<TutorPersona, TtsVoice>>;
 
 export type SubjectBreakdown = Record<SubjectType, number>;
 
@@ -80,6 +89,23 @@ const getDefaultSubjectBreakdown = (): SubjectBreakdown => ({
 });
 
 const SUBJECT_TYPES: SubjectType[] = ['Math', 'Physics', 'Chemistry', 'History', 'Other'];
+
+const isTtsVoice = (value: unknown): value is TtsVoice =>
+  typeof value === 'string' && TTS_VOICES.includes(value as TtsVoice);
+
+const dataResetListeners = new Set<() => void>();
+
+const notifyDataReset = () => {
+  dataResetListeners.forEach((listener) => listener());
+};
+
+const createInstallationId = async (): Promise<string> => {
+  try {
+    return await Crypto.randomUUID();
+  } catch {
+    return `user-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+};
 
 const normalizeSubject = (raw: string | null | undefined): SubjectType => {
   const value = (raw || '').trim().toLowerCase();
@@ -167,11 +193,49 @@ export const getTodayString = (): string => {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 };
 
+export const getInstallationId = async (): Promise<string> => {
+  const existingId = await AsyncStorage.getItem(KEYS.INSTALLATION_ID);
+  if (existingId) {
+    return existingId;
+  }
+
+  const newId = await createInstallationId();
+  await AsyncStorage.setItem(KEYS.INSTALLATION_ID, newId);
+  return newId;
+};
+
+export const resetInstallationId = async (): Promise<string> => {
+  const newId = await createInstallationId();
+  await AsyncStorage.setItem(KEYS.INSTALLATION_ID, newId);
+  return newId;
+};
+
 // 心情记录操作
 export const getMoodHistory = async (): Promise<MoodRecord[]> => {
   try {
     const data = await AsyncStorage.getItem(KEYS.MOOD_HISTORY);
-    return data ? JSON.parse(data) : [];
+    if (!data) {
+      return [];
+    }
+
+    const parsed = JSON.parse(data);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.reduce<MoodRecord[]>((records, record) => {
+      if (!record || typeof record.date !== 'string') {
+        return records;
+      }
+
+      const mood = normalizeMoodType(record.mood);
+      if (!mood) {
+        return records;
+      }
+
+      records.push({ date: record.date, mood });
+      return records;
+    }, []);
   } catch {
     return [];
   }
@@ -195,7 +259,7 @@ export const getTodayMood = async (): Promise<MoodType | null> => {
   const today = getTodayString();
   const history = await getMoodHistory();
   const todayRecord = history.find((record) => record.date === today);
-  return todayRecord?.mood || null;
+  return todayRecord?.mood ?? 'Calm';
 };
 
 // 水滴记录操作
@@ -246,36 +310,20 @@ export const trackLocalEvent = async (
   }
 };
 
-export const addDrop = async ({ dedupeKey }: { dedupeKey?: string } = {}): Promise<DropUpdateResult> => {
+export const addDrop = async ({ dedupeKey }: { dedupeKey?: string } = {}): Promise<number> => {
   const today = getTodayString();
   const drops = await getDailyDrops();
   const currentTodayDrops = drops[today] || 0;
   const previousMindGardenState = computeMindGardenState(drops);
 
   if (currentTodayDrops >= DAILY_DROP_LIMIT) {
-    return {
-      drops: currentTodayDrops,
-      added: false,
-      duplicate: false,
-      alreadyAtLimit: true,
-      goalReached: false,
-      mindGardenState: previousMindGardenState,
-      unlockedStamp: null,
-    };
+    return currentTodayDrops;
   }
 
   const signatures = await getDailyDropSignatures();
   const todaySignatures = signatures[today] || [];
   if (dedupeKey && todaySignatures.includes(dedupeKey)) {
-    return {
-      drops: currentTodayDrops,
-      added: false,
-      duplicate: true,
-      alreadyAtLimit: false,
-      goalReached: false,
-      mindGardenState: previousMindGardenState,
-      unlockedStamp: null,
-    };
+    return currentTodayDrops;
   }
 
   const nextDrops: DropsData = {
@@ -314,15 +362,7 @@ export const addDrop = async ({ dedupeKey }: { dedupeKey?: string } = {}): Promi
     });
   }
 
-  return {
-    drops: nextDrops[today],
-    added: true,
-    duplicate: false,
-    alreadyAtLimit: false,
-    goalReached,
-    mindGardenState: nextMindGardenState,
-    unlockedStamp,
-  };
+  return nextDrops[today];
 };
 
 export const getMindGardenStateData = async (): Promise<MindGardenState> => {
@@ -361,14 +401,49 @@ export const toggleMOTDLike = async (date: string): Promise<boolean> => {
 export const getCurrentPersona = async (): Promise<TutorPersona> => {
   try {
     const data = await AsyncStorage.getItem(KEYS.CURRENT_PERSONA);
-    return (data as TutorPersona) || 'Neutral';
+    return normalizeTutorPersona(data);
   } catch {
-    return 'Neutral';
+    return 'Einstein';
   }
 };
 
 export const saveCurrentPersona = async (persona: TutorPersona): Promise<void> => {
   await AsyncStorage.setItem(KEYS.CURRENT_PERSONA, persona);
+};
+
+export const getPersonaVoicePreferences = async (): Promise<PersonaVoicePreferences> => {
+  try {
+    const data = await AsyncStorage.getItem(KEYS.PERSONA_VOICE_PREFERENCES);
+    if (!data) {
+      return {};
+    }
+
+    const parsed = JSON.parse(data);
+    if (!parsed || typeof parsed !== 'object') {
+      return {};
+    }
+
+    return Object.entries(parsed).reduce<PersonaVoicePreferences>((accumulator, [persona, voice]) => {
+      const normalizedPersona = normalizeTutorPersona(persona);
+      if (isTtsVoice(voice)) {
+        accumulator[normalizedPersona] = voice;
+      }
+      return accumulator;
+    }, {});
+  } catch {
+    return {};
+  }
+};
+
+export const getPersonaVoicePreference = async (persona: TutorPersona): Promise<TtsVoice | null> => {
+  const preferences = await getPersonaVoicePreferences();
+  return preferences[persona] ?? null;
+};
+
+export const savePersonaVoicePreference = async (persona: TutorPersona, voice: TtsVoice): Promise<void> => {
+  const preferences = await getPersonaVoicePreferences();
+  preferences[persona] = voice;
+  await AsyncStorage.setItem(KEYS.PERSONA_VOICE_PREFERENCES, JSON.stringify(preferences));
 };
 
 // 聊天历史
@@ -380,9 +455,14 @@ export const getChatHistory = async (): Promise<ChatMessage[]> => {
     }
 
     const parsed = JSON.parse(data);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
     return parsed.map((message: ChatMessage) => ({
       ...message,
       timestamp: new Date(message.timestamp),
+      persona: message.persona ? normalizeTutorPersona(message.persona) : undefined,
     }));
   } catch {
     return [];
@@ -429,10 +509,21 @@ export const saveTutorGreetingState = async (persona: TutorPersona): Promise<voi
 // 清空所有数据
 export const clearAllData = async (): Promise<void> => {
   await AsyncStorage.multiRemove(Object.values(KEYS));
+  await resetInstallationId();
+  notifyDataReset();
 };
 
 export const clearChatHistory = async (): Promise<void> => {
   await AsyncStorage.setItem(KEYS.CHAT_HISTORY, JSON.stringify([]));
+  notifyDataReset();
+};
+
+export const subscribeToDataReset = (listener: () => void): (() => void) => {
+  dataResetListeners.add(listener);
+
+  return () => {
+    dataResetListeners.delete(listener);
+  };
 };
 
 // 获取用户数据摘要
@@ -461,7 +552,6 @@ export const getUserStats = async (): Promise<{
     todayMinutes: 0,
   };
 };
-
 
 const getTutorFocusTimeData = async (): Promise<TutorFocusTimeData> => {
   try {
