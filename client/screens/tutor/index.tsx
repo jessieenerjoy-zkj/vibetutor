@@ -209,7 +209,7 @@ export default function TutorScreen() {
   const reportLaunchHandledRef = useRef<string | null>(null);
   const focusIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const insets = useSafeAreaInsets();
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const [currentPersona, setCurrentPersona] = useState<TutorPersona>('Einstein');
   const [selectedStylePersona, setSelectedStylePersona] = useState<TutorPersona>('Einstein');
   const [isStylePickerVisible, setIsStylePickerVisible] = useState(false);
@@ -234,6 +234,9 @@ export default function TutorScreen() {
   const previewPersona = PERSONA_CONFIG[selectedStylePersona];
   const persona = PERSONA_CONFIG[currentPersona];
   const styleCardWidth = Math.max(screenWidth - 56, 280);
+  const isDesktopWeb = Platform.OS === 'web' && screenWidth >= 980;
+  const webModalWidth = Math.min(430, Math.max(320, screenWidth - 24));
+  const webModalHeight = Math.max(560, Math.min(920, screenHeight - 24));
 
   // 监听键盘事件
   useEffect(() => {
@@ -1397,8 +1400,10 @@ export default function TutorScreen() {
               className="absolute inset-0 bg-black/45"
             />
             <View
-              className="w-full max-w-[760px] rounded-[40px] bg-white px-6 py-7"
+              className="w-full rounded-[40px] bg-white px-6 py-7"
               style={{
+                width: '100%',
+                maxWidth: isDesktopWeb ? webModalWidth : 760,
                 shadowColor: '#120811',
                 shadowOffset: { width: 0, height: 12 },
                 shadowOpacity: 0.16,
@@ -1440,16 +1445,36 @@ export default function TutorScreen() {
 
         <Modal
           visible={showReportCard}
-          animationType="slide"
-          transparent={false}
+          animationType={isDesktopWeb ? 'fade' : 'slide'}
+          transparent={isDesktopWeb}
           onRequestClose={() => setShowReportCard(false)}
         >
-          <View className="flex-1 bg-[#F9F2F7]">
-            <ScrollView
-              className="flex-1"
-              contentContainerStyle={{ paddingHorizontal: 22, paddingTop: 40, paddingBottom: 26 }}
-              showsVerticalScrollIndicator={false}
+          <View
+            className={isDesktopWeb ? 'flex-1 items-center justify-center px-3 py-3 bg-black/45' : 'flex-1'}
+          >
+            <View
+              className="w-full flex-1 bg-[#F9F2F7]"
+              style={
+                isDesktopWeb
+                  ? {
+                      maxWidth: webModalWidth,
+                      maxHeight: webModalHeight,
+                      borderRadius: 30,
+                      overflow: 'hidden',
+                      shadowColor: '#120811',
+                      shadowOffset: { width: 0, height: 12 },
+                      shadowOpacity: 0.2,
+                      shadowRadius: 24,
+                      elevation: 10,
+                    }
+                  : undefined
+              }
             >
+              <ScrollView
+                className="flex-1"
+                contentContainerStyle={{ paddingHorizontal: 22, paddingTop: 40, paddingBottom: 26 }}
+                showsVerticalScrollIndicator={false}
+              >
               <Text className="mt-2 text-center text-[20px] font-bold tracking-[-0.2px] text-[#221A22]">
                 Daily Learning Report
               </Text>
@@ -1587,7 +1612,8 @@ export default function TutorScreen() {
                   <Text className="text-base font-semibold text-[#6D5A63]">Back to Home</Text>
                 </TouchableOpacity>
               </View>
-            </ScrollView>
+              </ScrollView>
+            </View>
           </View>
         </Modal>
 

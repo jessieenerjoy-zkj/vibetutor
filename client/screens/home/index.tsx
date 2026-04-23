@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
@@ -355,6 +356,8 @@ const buildSharePosterSvg = (quote: string, author: string, dateLabel: string) =
 export default function HomeScreen() {
   const router = useSafeRouter();
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
+  const isDesktopWeb = Platform.OS === 'web' && screenWidth >= 980;
   const [todayMood, setTodayMood] = useState<MoodType | null>(null);
   const [todayDrops, setTodayDrops] = useState(0);
   const [motdIndex, setMotdIndex] = useState(0);
@@ -833,7 +836,7 @@ export default function HomeScreen() {
               style={styles.posterMask}
             />
 
-            <View style={styles.posterSheet}>
+            <View style={[styles.posterSheet, isDesktopWeb && styles.posterSheetDesktop]}>
               <ScrollView
                 style={styles.posterViewport}
                 contentContainerStyle={styles.posterViewportContent}
@@ -1256,6 +1259,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.16,
     shadowRadius: 26,
     elevation: 8,
+  },
+  posterSheetDesktop: {
+    maxWidth: 430,
   },
   posterViewport: {
     maxHeight: 520,
