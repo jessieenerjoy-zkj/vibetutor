@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Linking,
@@ -12,10 +12,13 @@ import {
   View,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as MediaLibrary from 'expo-media-library';
 import { useFocusEffect } from 'expo-router';
 import { FontAwesome6 } from '@expo/vector-icons';
 import Reanimated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 import { SvgXml } from 'react-native-svg';
+import { captureRef } from 'react-native-view-shot';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppProfileIcon } from '@/components/AppProfileIcon';
 import { Screen } from '@/components/Screen';
@@ -359,6 +362,8 @@ export default function HomeScreen() {
   const [aiInsight, setAiInsight] = useState('');
   const [isLoadingInsight, setIsLoadingInsight] = useState(false);
   const [showSharePoster, setShowSharePoster] = useState(false);
+  const [isSavingPoster, setIsSavingPoster] = useState(false);
+  const posterCaptureRef = useRef<View | null>(null);
 
   useEffect(() => {
     const today = new Date();
@@ -527,9 +532,44 @@ export default function HomeScreen() {
       return;
     }
 
-    await Clipboard.setStringAsync(sharePosterText);
-    Alert.alert('Poster Ready', 'Use screenshot to save this poster, then post it.');
-  }, [posterPayload.svg, sharePosterText, todayLabel]);
+    if (!posterCaptureRef.current || isSavingPoster) {
+      return;
+    }
+
+    setIsSavingPoster(true);
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please allow photo access to save the poster.');
+        return;
+      }
+
+      const captureUri = await captureRef(posterCaptureRef, {
+        format: 'png',
+        quality: 1,
+      });
+
+      const fileName = `vibetutor-daily-quote-${todayLabel.replace(/\./g, '-')}.png`;
+      const fileRoot = ((FileSystem as any).cacheDirectory || (FileSystem as any).documentDirectory) as string | null;
+      if (!fileRoot) {
+        throw new Error('No writable file directory available');
+      }
+
+      const targetUri = `${fileRoot}${fileName}`;
+      await FileSystem.copyAsync({
+        from: captureUri,
+        to: targetUri,
+      });
+
+      await MediaLibrary.saveToLibraryAsync(targetUri);
+      Alert.alert('Saved', 'Poster saved to your photo album.');
+    } catch (error) {
+      console.error('Failed to save poster image:', error);
+      Alert.alert('Save failed', 'Unable to save the poster right now. Please try again.');
+    } finally {
+      setIsSavingPoster(false);
+    }
+  }, [isSavingPoster, todayLabel]);
 
   const handleShareToChannel = useCallback(
     async (channel: 'tiktok' | 'instagram') => {
@@ -799,7 +839,7 @@ export default function HomeScreen() {
                 contentContainerStyle={styles.posterViewportContent}
                 showsVerticalScrollIndicator={false}
               >
-                <View style={styles.posterCanvasWrap}>
+                <View ref={posterCaptureRef} collapsable={false} style={styles.posterCanvasWrap}>
                   <SvgXml
                     xml={posterPayload.svg}
                     width="100%"
@@ -813,9 +853,10 @@ export default function HomeScreen() {
                   activeOpacity={0.85}
                   onPress={() => void handleDownloadPoster()}
                   style={styles.posterActionButton}
+                  disabled={isSavingPoster}
                 >
                   <FontAwesome6 name="download" size={18} color={UI.text} />
-                  <Text style={styles.posterActionText}>下载图片</Text>
+                  <Text style={styles.posterActionText}>{isSavingPoster ? 'Saving...' : 'Download'}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -833,7 +874,7 @@ export default function HomeScreen() {
                   style={styles.posterActionButton}
                 >
                   <FontAwesome6 name="instagram" size={18} color={UI.text} />
-                  <Text style={styles.posterActionText}>INS</Text>
+                  <Text style={styles.posterActionText}>Instagram</Text>
                 </TouchableOpacity>
               </View>
             </View>
