@@ -135,6 +135,23 @@ const getWelcomeMessage = (persona: TutorPersona): ChatMessage => {
   };
 };
 
+const SESSION_DIVIDER_PREFIX = '__session_divider__:';
+
+const createSessionDividerMessage = (label: string): ChatMessage => ({
+  id: `${Date.now()}-divider-${Math.random().toString(36).slice(2, 8)}`,
+  role: 'system',
+  content: `${SESSION_DIVIDER_PREFIX}${label}`,
+  timestamp: new Date(),
+});
+
+const isSessionDividerMessage = (message: ChatMessage): boolean =>
+  message.role === 'system' && message.content.startsWith(SESSION_DIVIDER_PREFIX);
+
+const getSessionDividerLabel = (message: ChatMessage): string =>
+  isSessionDividerMessage(message)
+    ? message.content.slice(SESSION_DIVIDER_PREFIX.length)
+    : '';
+
 const normalizeStyleCommand = (value: string): string => {
   return value.replace(/[\s【】!！?？,，.。~～、:：;；'"“”‘’（）()\-]/g, '');
 };
@@ -254,7 +271,10 @@ export default function TutorScreen() {
     
     if (history.length === 0) {
       const welcomeMsg = getWelcomeMessage(persona);
-      setMessages([welcomeMsg]);
+      const sessionDivider = createSessionDividerMessage('New Conversation');
+      const initialMessages = [sessionDivider, welcomeMsg];
+      setMessages(initialMessages);
+      await saveChatHistory(initialMessages);
     }
   }, []);
 
@@ -616,7 +636,8 @@ export default function TutorScreen() {
       const filteredMessages = prev.filter(
         (message) => !(message.role === 'assistant' && welcomeMessageSet.has(message.content))
       );
-      const newMessages = [...filteredMessages, nextWelcome];
+      const sessionDivider = createSessionDividerMessage(`Switched to ${PERSONA_CONFIG[nextPersona].label}`);
+      const newMessages = [...filteredMessages, sessionDivider, nextWelcome];
       void saveChatHistory(newMessages);
       return newMessages;
     });
@@ -901,7 +922,10 @@ export default function TutorScreen() {
     scrollToBottom();
 
     try {
-      const history = messages.slice(-10).map((msg) => ({
+      const history = messages
+        .filter((msg) => msg.role !== 'system')
+        .slice(-10)
+        .map((msg) => ({
         role: msg.role,
         content: msg.content,
       }));
@@ -1019,7 +1043,7 @@ export default function TutorScreen() {
             onPress={() => setIsProfileExpanded((prev) => !prev)}
           >
             <View
-              className="px-5 pb-5"
+              className="px-5 pb-3"
               style={{
                 paddingTop: insets.top + 56,
                 backgroundColor: isProfileExpanded ? persona.color : 'var(--color-surface)',
@@ -1032,7 +1056,7 @@ export default function TutorScreen() {
                 elevation: 1,
               }}
             >
-              <View className="p-4 rounded-[28px]">
+              <View className="px-4 pt-3 pb-2 rounded-[28px]">
               <View className="flex-row items-start justify-between">
                 <View className="flex-row items-center flex-1">
                   <View className="relative">
@@ -1166,11 +1190,26 @@ export default function TutorScreen() {
           className="flex-1 px-5"
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
-            paddingTop: isProfileExpanded ? insets.top + 430 : insets.top + 190,
+            paddingTop: isProfileExpanded ? insets.top + 414 : insets.top + 176,
             paddingBottom: keyboardHeight > 0 ? 16 : 8,
           }}
         >
-          {messages.map((message) => (
+          {messages.map((message) => {
+            if (isSessionDividerMessage(message)) {
+              return (
+                <View key={message.id} className="mb-4 px-1">
+                  <View className="flex-row items-center">
+                    <View className="h-px flex-1 bg-[#D8DCE4]" />
+                    <Text className="mx-3 text-[11px] font-semibold tracking-[0.2px] text-[var(--color-muted)]">
+                      {getSessionDividerLabel(message)}
+                    </Text>
+                    <View className="h-px flex-1 bg-[#D8DCE4]" />
+                  </View>
+                </View>
+              );
+            }
+
+            return (
             <View
               key={message.id}
               className={`flex-row mb-4 ${
@@ -1209,7 +1248,8 @@ export default function TutorScreen() {
                 </Text>
               </View>
             </View>
-          ))}
+            );
+          })}
 
           {isTyping && (
             <View className="flex-row mb-4 justify-start">
