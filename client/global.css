@@ -321,3 +321,49 @@
   --radius-3xl: calc(var(--radius) * 3); /* 1.5rem (24px) */
   --radius-4xl: calc(var(--radius) * 4); /* 2rem (32px) */
 }
+
+/* Desktop web demo shell: keep a phone-like viewport when presenting on large screens. */
+@media (min-width: 980px) {
+  html,
+  body {
+    background:
+      radial-gradient(
+        1200px 600px at 8% 10%,
+        color-mix(in oklab, var(--color-primary) 10%, transparent),
+        transparent 70%
+      ),
+      radial-gradient(
+        1200px 700px at 92% 90%,
+        color-mix(in oklab, var(--color-secondary) 10%, transparent),
+        transparent 72%
+      ),
+      linear-gradient(
+        160deg,
+        color-mix(in oklab, var(--color-background) 92%, white 8%),
+        var(--color-background)
+      );
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 14px;
+    overflow: auto;
+  }
+
+  #root {
+    width: min(430px, 100vw - 28px);
+    height: min(920px, calc(100vh - 28px));
+    border-radius: 30px;
+    overflow: hidden;
+    border: 1px solid color-mix(in oklab, var(--color-border) 75%, transparent);
+    box-shadow:
+      0 24px 56px rgba(15, 23, 42, 0.16),
+      0 8px 20px rgba(15, 23, 42, 0.1);
+    background: var(--color-background);
+    flex: 0 0 auto;
+  }
+}
