@@ -404,7 +404,7 @@ export default function ProfileScreen() {
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 110 }}
+        contentContainerStyle={{ paddingBottom: Platform.OS === 'web' ? 74 : 110 }}
       >
         <View className="px-5 pt-3">
           <View

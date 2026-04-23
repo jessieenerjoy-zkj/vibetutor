@@ -633,7 +633,7 @@ export default function HomeScreen() {
 
         <ScrollView
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 112 }}
+          contentContainerStyle={{ paddingBottom: Platform.OS === 'web' ? 74 : insets.bottom + 112 }}
         >
           <View style={styles.content}>
             <Reanimated.View entering={FadeInDown.duration(280)} style={[styles.card, styles.section]}>
