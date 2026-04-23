@@ -45,6 +45,7 @@ import {
   TUTOR_PERSONAS,
   ChatMessage,
 } from '@/utils/types';
+import { DAILY_DROP_LIMIT } from '@/utils/learning';
 import {
   getCurrentPersona,
   getPersonaVoicePreferences,
@@ -987,7 +988,7 @@ export default function TutorScreen() {
 
         await recordTutorSolvedSubject(parsedReply.subject);
 
-        if (newDrops >= 10) {
+        if (newDrops >= DAILY_DROP_LIMIT) {
           Alert.alert('满杯达成!', '恭喜你完成了今日学习目标!');
         }
       } else {
@@ -1104,7 +1105,7 @@ export default function TutorScreen() {
                       </Text>
                       <View className="ml-2 px-2 py-0.5 bg-[#F5F5F7] rounded-full">
                         <Text className="text-xs text-[var(--color-muted)]">
-                          {todayDrops}/10
+                          {todayDrops}/{DAILY_DROP_LIMIT}
                         </Text>
                       </View>
                     </View>
@@ -1714,7 +1715,7 @@ export default function TutorScreen() {
                                   </Text>
                                   <View className="ml-2 px-2 py-0.5 bg-[#F5F5F7] rounded-full">
                                     <Text className="text-xs text-[var(--color-muted)]">
-                                      {todayDrops}/10
+                                      {todayDrops}/{DAILY_DROP_LIMIT}
                                     </Text>
                                   </View>
                                 </View>
