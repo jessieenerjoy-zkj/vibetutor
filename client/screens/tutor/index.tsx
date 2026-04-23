@@ -234,10 +234,12 @@ export default function TutorScreen() {
   const lastAutoWelcomedKeyRef = useRef<string | null>(null);
   const previewPersona = PERSONA_CONFIG[selectedStylePersona];
   const persona = PERSONA_CONFIG[currentPersona];
-  const styleCardWidth = Math.max(screenWidth - 56, 280);
   const isDesktopWeb = Platform.OS === 'web' && screenWidth >= 980;
   const webModalWidth = Math.min(430, Math.max(320, screenWidth - 24));
   const webModalHeight = Math.max(560, Math.min(920, screenHeight - 24));
+  const stylePickerSheetWidth = isDesktopWeb ? webModalWidth : screenWidth;
+  const stylePickerListWidth = Math.max(280, stylePickerSheetWidth - 40);
+  const styleCardWidth = Math.max(260, stylePickerListWidth - 24);
 
   // 监听键盘事件
   useEffect(() => {
@@ -429,18 +431,18 @@ export default function TutorScreen() {
   }, [currentPersona]);
 
   const updateStyleByOffset = useCallback((offsetX: number) => {
-    if (!Number.isFinite(offsetX) || screenWidth <= 0) {
+    if (!Number.isFinite(offsetX) || stylePickerListWidth <= 0) {
       return;
     }
 
-    const nextIndex = Math.round(offsetX / screenWidth);
+    const nextIndex = Math.round(offsetX / stylePickerListWidth);
     const clampedIndex = Math.max(0, Math.min(TUTOR_PERSONAS.length - 1, nextIndex));
     const nextPersona = TUTOR_PERSONAS[clampedIndex];
 
     if (nextPersona && nextPersona !== selectedStylePersona) {
       setSelectedStylePersona(nextPersona);
     }
-  }, [screenWidth, selectedStylePersona]);
+  }, [selectedStylePersona, stylePickerListWidth]);
 
   const handleStyleScrollEnd = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -1624,8 +1626,30 @@ export default function TutorScreen() {
           transparent
           onRequestClose={() => setIsStylePickerVisible(false)}
         >
-          <View className="flex-1 bg-black/45 justify-end">
-            <View className="rounded-t-[32px] bg-[var(--color-background)] px-5 pt-5 pb-8">
+          <View
+            className={isDesktopWeb ? 'flex-1 bg-black/45 items-center justify-center px-3 py-3' : 'flex-1 bg-black/45 justify-end'}
+          >
+            <View
+              className="bg-[var(--color-background)] px-5 pt-5 pb-8"
+              style={
+                isDesktopWeb
+                  ? {
+                      width: '100%',
+                      maxWidth: webModalWidth,
+                      maxHeight: webModalHeight,
+                      borderRadius: 30,
+                      shadowColor: '#120811',
+                      shadowOffset: { width: 0, height: 12 },
+                      shadowOpacity: 0.2,
+                      shadowRadius: 24,
+                      elevation: 10,
+                    }
+                  : {
+                      borderTopLeftRadius: 32,
+                      borderTopRightRadius: 32,
+                    }
+              }
+            >
               <View className="flex-row items-center justify-between mb-4">
                 <View>
                   <Text className="text-xl font-bold text-[var(--color-foreground)]">
@@ -1652,13 +1676,14 @@ export default function TutorScreen() {
                 pagingEnabled
                 decelerationRate="fast"
                 showsHorizontalScrollIndicator={false}
+                style={{ width: stylePickerListWidth, alignSelf: 'center' }}
                 onScroll={(event) => updateStyleByOffset(event.nativeEvent.contentOffset.x)}
                 scrollEventThrottle={16}
                 onScrollEndDrag={handleStyleScrollEnd}
                 onMomentumScrollEnd={handleStyleScrollEnd}
                 getItemLayout={(_, index) => ({
-                  length: screenWidth,
-                  offset: screenWidth * index,
+                  length: stylePickerListWidth,
+                  offset: stylePickerListWidth * index,
                   index,
                 })}
                 renderItem={({ item }) => {
@@ -1666,7 +1691,7 @@ export default function TutorScreen() {
                   const isSelected = item === selectedStylePersona;
 
                   return (
-                    <View style={{ width: screenWidth }} className="items-center">
+                    <View style={{ width: stylePickerListWidth }} className="items-center">
                       <TouchableOpacity
                         activeOpacity={0.92}
                         onPress={() => {
