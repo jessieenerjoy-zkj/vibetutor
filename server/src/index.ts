@@ -624,6 +624,8 @@ const getTutorSystemPrompt = (persona: TutorPersona): string => {
   const sharedRules = `Global rules:
 - Stay fully in character for the selected tutor voice.
 - By default, reply in English. If the user explicitly asks for another language, follow that request.
+- End every reply with exactly one subject tag in this format: [Subject: Math], [Subject: Physics], [Subject: Chemistry], [Subject: History], or [Subject: Other].
+- Put the subject tag at the very end of the reply, and do not add any text after it.
 - Keep the answer academically correct, concrete, and useful.
 - Match the user's task: short for direct questions, longer for complex problems.
 - When solving, make the reasoning visible instead of jumping to the final answer.

@@ -627,6 +627,51 @@ export const extractSubjectTag = (rawContent: string): { content: string; subjec
   const text = String(rawContent || '');
   const trimmed = text.trimEnd();
 
+  // Primary path: strict end-tag format, e.g. "... [Subject: Math]"
+  const strictTagMarker = /\[subject:/i;
+  const strictMarkerMatch = strictTagMarker.exec(trimmed);
+  if (strictMarkerMatch?.index !== undefined) {
+    const tagStartIndex = strictMarkerMatch.index;
+    const tagSlice = trimmed.slice(tagStartIndex);
+    const closingBracketIndex = tagSlice.indexOf(']');
+
+    if (closingBracketIndex > 0) {
+      const afterTag = tagSlice.slice(closingBracketIndex + 1).trim();
+      if (!afterTag) {
+        const insideTag = tagSlice.slice(1, closingBracketIndex).trim();
+        const separatorIndex = insideTag.indexOf(':');
+        if (separatorIndex !== -1) {
+          const subjectText = insideTag.slice(separatorIndex + 1).trim();
+          return {
+            content: trimmed.slice(0, tagStartIndex).trimEnd(),
+            subject: normalizeSubject(subjectText),
+          };
+        }
+      }
+    }
+  }
+
+  // Fallback path: tolerate variants like "Subject: Math" without brackets.
+  const lowerTrimmed = trimmed.toLowerCase();
+  const lowerMarker = '\nsubject:';
+  const inlineMarker = 'subject:';
+  const markerIndex = lowerTrimmed.lastIndexOf(lowerMarker);
+  const fallbackStartIndex = markerIndex >= 0
+    ? markerIndex + 1
+    : (lowerTrimmed.startsWith(inlineMarker) ? 0 : -1);
+
+  if (fallbackStartIndex >= 0) {
+    const fallbackTag = trimmed.slice(fallbackStartIndex).trim();
+    const separatorIndex = fallbackTag.indexOf(':');
+    if (separatorIndex !== -1) {
+      const subjectText = fallbackTag.slice(separatorIndex + 1).trim();
+      return {
+        content: trimmed.slice(0, fallbackStartIndex).trimEnd(),
+        subject: normalizeSubject(subjectText),
+      };
+    }
+  }
+
   const closeBracketIndex = trimmed.lastIndexOf(']');
   const openBracketIndex = trimmed.lastIndexOf('[');
 
